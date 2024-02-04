@@ -13,7 +13,7 @@ import {
   UpdatePaidStatusDto,
 } from './dto/create-hub.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import * as argon from 'argon2';
 import { Hub } from './schema/hubs.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -130,7 +130,7 @@ export class HubService {
   }
 
   isValidObjectId(id: string): boolean {
-    return id.match(/^[0-9a-fA-F]{24}$/) != null;
+    return mongoose.Types.ObjectId.isValid(id);
   }
 
   async forgotPassword(
@@ -833,14 +833,18 @@ export class HubService {
     }
   }
 
-  async getUsersUnderHub(hubId: any) {
+  async getUsersUnderHub(hubId: string) {
     try {
-      const hub = await this.hubModel.findById(hubId).populate('hubs_users');
-      if (!hub) {
-        throw new NotFoundException('Hub not found');
+      if (!this.isValidObjectId(hubId)) {
+        throw new BadRequestException('Invalid hub ID format');
       }
 
-      const usersUnderHub = hub.hubs_users;
+      const usersUnderHub = await this.userModel.find({ hub: hubId });
+
+      const hubExists = await this.hubModel.exists({ _id: hubId });
+      if (!hubExists) {
+        throw new NotFoundException('Hub not found');
+      }
 
       return {
         statusCode: 200,
@@ -852,6 +856,11 @@ export class HubService {
       this.logger.error(
         `Error retrieving users for hub ${hubId}: ${error.message}`,
       );
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
       throw new BadRequestException('Could not retrieve users');
     }
   }
@@ -1047,5 +1056,39 @@ export class HubService {
       },
       { scheduled: true },
     );
+  }
+
+  async getMe(hubId: string): Promise<IResponse> {
+    if (!this.isValidObjectId(hubId)) {
+      throw new BadRequestException('Invalid hub ID format');
+    }
+
+    const hub = await this.hubModel.findById(hubId).select({
+      password: 0,
+      otp: 0,
+      otpCreatedAt: 0,
+    });
+
+    if (!hub) {
+      throw new NotFoundException('Hub not found');
+    }
+
+    // Find users associated with this hub
+    const hubUsers = await this.userModel.find({ hub: hubId }).select({
+      password: 0,
+      otp: 0,
+      otpCreatedAt: 0,
+    });
+
+    // Create a response object that includes hub details and its users
+    return {
+      statusCode: 200,
+      message: 'Hub details retrieved successfully',
+      data: {
+        hub,
+        users: hubUsers,
+      },
+      error: null,
+    };
   }
 }

@@ -322,4 +322,11 @@ export class HubsController {
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.hubsService.resetPassword(resetPasswordDto);
   }
+
+  @Post('me')
+  @UseGuards(JwtGuard)
+  async getMe(@Req() req): Promise<IResponse> {
+    const hubId = req.user._id;
+    return this.hubsService.getMe(hubId);
+  }
 }
