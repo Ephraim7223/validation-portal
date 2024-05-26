@@ -27,7 +27,7 @@ export class CreateUserDto {
 
   @IsString()
   @IsNotEmpty()
-  organisation: string;
+  hub: string;
 
   @IsString()
   @IsNotEmpty()
