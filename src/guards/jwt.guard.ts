@@ -1,21 +1,32 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { User } from 'src/auth/schema';
 
 export class JwtGuard extends AuthGuard('jwt') {
-  public handleRequest(err: unknown, user: User): any {
-    if (!user)
-      throw new UnauthorizedException(
-        'invalid or expired token: login to access this resource',
+  public handleRequest(err: unknown, user: any): any {
+    if (err || !user) {
+      throw (
+        err ||
+        new UnauthorizedException(
+          'Invalid or expired token: login to access this resource',
+        )
       );
+    }
     return user;
   }
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
-    await super.canActivate(context);
+    const canActivate = await super.canActivate(context);
+    if (!canActivate) {
+      return false;
+    }
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
+    const { user } = request;
 
-    return user ? true : false;
+    if (!user) {
+      throw new UnauthorizedException('No user found in request');
+    }
+
+    return true;
   }
 }
