@@ -12,13 +12,13 @@ import { IResponse } from 'src/interfaces';
 import * as argon from 'argon2';
 import { JwtHelper } from 'src/common/helpers';
 import { LoginDto, SignUpDto } from './dto';
-import { User } from './schema/user.schema';
+import { Admin } from './schema/user.schema';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(@InjectModel('User') private readonly userModel: Model<User>) {}
+  constructor(@InjectModel('User') private readonly userModel: Model<Admin>) {}
 
   async createUser(signupDto: SignUpDto): Promise<IResponse> {
     if (signupDto.password !== signupDto.confirmPassword) {

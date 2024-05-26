@@ -20,7 +20,7 @@ export class Admin {
   @Prop()
   secretToken?: string;
 
-  @Prop({ default: 'user' })
+  @Prop({ default: 'admin' })
   role?: string;
 }
 
