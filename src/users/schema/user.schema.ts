@@ -17,19 +17,13 @@ export class User {
   lastName: string;
 
   @Prop({ required: true })
-  phoneNumber: string;
-
-  @Prop({ required: true })
-  password: string;
+  phoneNumber: number;
 
   @Prop({ required: true })
   profilePic: string;
 
   @Prop({ required: true })
   NIN: number;
-
-  @Prop({ required: true })
-  organisation: string;
 
   @Prop({})
   qrcode: string;

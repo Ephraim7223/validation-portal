@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument } from 'mongoose';
-import { User } from 'src/users/schema/index';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
+// import { User } from 'src/users/schema/index';
 
 export type HubDocument = HydratedDocument<Hub>;
 
@@ -21,20 +21,20 @@ export class Hub {
   @Prop()
   secretToken?: string;
 
-  @Prop({})
+  @Prop({ required: true })
   logo: string;
 
-  @Prop({})
+  @Prop({ required: true })
   address: string;
 
-  @Prop({})
+  @Prop({ required: true })
   TIN: string;
 
-  @Prop({})
+  @Prop({ required: true })
   CAC: string;
 
   @Prop({})
-  hubId: string;
+  hubID: string;
 
   @Prop({})
   isSuspended: boolean;
@@ -43,7 +43,7 @@ export class Hub {
   isVerified: string;
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] })
-  hubs_users: User[];
+  hubs_users: Types.ObjectId[];
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

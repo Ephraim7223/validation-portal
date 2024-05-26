@@ -11,10 +11,10 @@ export class UserService {
   private readonly logger = new Logger(UserService.name);
 
   constructor(
-    @InjectModel('User')
+    @InjectModel(User.name)
     private readonly userModel: Model<User>,
     private readonly cloudinary: CloudinaryService,
-    @InjectModel('Hub')
+    @InjectModel(Hub.name)
     private readonly hubModel: Model<Hub>,
   ) {}
 
@@ -25,12 +25,11 @@ export class UserService {
     return publicId;
   }
 
-  async register(
-    createUserDto: CreateUserDto,
-    profilePic: Express.Multer.File[],
-  ) {
+  async register(createUserDto: CreateUserDto) {
     let response: any;
-    const { email, hub } = createUserDto;
+    const { email, hub, NIN, phoneNumber } = createUserDto;
+    const ninAsNumber = parseInt(NIN);
+    const phoneNumberAsNumber = parseInt(phoneNumber);
 
     this.logger.log('Looking for a user with an existing email');
     const existingUser = await this.userModel.findOne({ email });
@@ -38,11 +37,11 @@ export class UserService {
     if (existingUser) {
       response = {
         statusCode: 409,
-        message: 'User with existing sku already exists',
+        message: 'User with existing email already exists',
         data: null,
         error: {
           code: 'USER_ALREADY_EXIST',
-          message: 'User with existing sku already exists',
+          message: 'User with existing email already exists',
         },
       };
     } else {
@@ -54,11 +53,11 @@ export class UserService {
         throw new BadRequestException('Hub does not exist.');
       }
       this.logger.log(`Uploading profile-picture to cloud...`);
-      const uploadedImages = [];
-      for (const image of profilePic) {
-        const uploadedImage = await this.cloudinary.upload(image);
-        uploadedImages.push(uploadedImage.secure_url);
-      }
+      const profilePic = await this.cloudinary.upload(
+        createUserDto.profilePic[0],
+      );
+
+      delete createUserDto.profilePic;
 
       const userCount = await this.userModel.countDocuments({
         hub: hubRecord._id,
@@ -68,7 +67,9 @@ export class UserService {
       const newUser = await this.userModel.create({
         ...createUserDto,
         hub: hubRecord._id,
-        profilePic: uploadedImages,
+        NIN: ninAsNumber,
+        phoneNumber: phoneNumberAsNumber,
+        profilePic: profilePic.secure_url,
       });
 
       response = {
