@@ -18,7 +18,7 @@ import { Admin } from './schema/user.schema';
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(@InjectModel('User') private readonly userModel: Model<Admin>) {}
+  constructor(@InjectModel('Admin') private readonly userModel: Model<Admin>) {}
 
   // async createUser(signupDto: SignUpDto): Promise<IResponse> {
   //   if (signupDto.password !== signupDto.confirmPassword) {
