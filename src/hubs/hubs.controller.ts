@@ -13,6 +13,8 @@ import {
   Param,
   Patch,
   Delete,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
@@ -140,5 +142,37 @@ export class HubsController {
   @Delete(':id')
   async deleteHub(@Param('id') id: string) {
     return this.hubsService.deleteHub(id);
+  }
+
+  @Patch('suspend/:id')
+  async suspendHub(@Param('id') id: string) {
+    try {
+      const result = await this.hubsService.suspendHub(id);
+      return result;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('Hub not found');
+      } else if (error instanceof BadRequestException) {
+        throw new BadRequestException('Hub is already suspended');
+      } else {
+        throw new UnauthorizedException('Could not suspend hub');
+      }
+    }
+  }
+
+  @Patch('unsuspend/:id')
+  async unsuspendHub(@Param('id') id: string) {
+    try {
+      const result = await this.hubsService.unsuspendHub(id);
+      return result;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('Hub not found');
+      } else if (error instanceof BadRequestException) {
+        throw new BadRequestException('Hub is not suspended');
+      } else {
+        throw new UnauthorizedException('Could not unsuspend hub');
+      }
+    }
   }
 }

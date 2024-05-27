@@ -17,6 +17,8 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { JwtHelper } from 'src/common/helpers';
 import { generateHubID } from 'src/functions/genrating-random-number';
 import { VerifiedMail } from 'src/templates/verified';
+import { SuspensionMail } from 'src/templates/suspensionMail';
+import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 
 @Injectable()
 export class HubService {
@@ -42,7 +44,7 @@ export class HubService {
     let response: any;
     const { email, hubName } = createHubDto;
 
-    this.logger.log('Looking for a user with an existing email');
+    this.logger.log('Looking for a hub with an existing email');
     const existingHub = await this.hubModel.findOne({ email });
 
     if (existingHub) {
@@ -271,6 +273,63 @@ export class HubService {
     } catch (error) {
       this.logger.error(`Error deleting hub: ${error.message}`);
       throw new BadRequestException('Could not delete hub');
+    }
+  }
+
+  async suspendHub(id: string) {
+    try {
+      const hubToSuspend = await this.hubModel.findById(id);
+      if (!hubToSuspend) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      if (hubToSuspend.isSuspended === true) {
+        throw new BadRequestException('Hub is already suspended');
+      }
+
+      hubToSuspend.isSuspended = true;
+      await hubToSuspend.save();
+      await SuspensionMail.mail(hubToSuspend.hubName, hubToSuspend.email);
+
+      return {
+        statusCode: 200,
+        message: 'Hub suspended successfully',
+        data: hubToSuspend,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error suspending hub: ${error.message}`);
+      throw new BadRequestException('Could not suspend hub');
+    }
+  }
+
+  async unsuspendHub(id: string) {
+    try {
+      const hubToUnsuspend = await this.hubModel.findById(id);
+      if (!hubToUnsuspend) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      if (hubToUnsuspend.isSuspended === false) {
+        throw new BadRequestException('Hub is not suspended');
+      }
+
+      hubToUnsuspend.isSuspended = false;
+      await hubToUnsuspend.save();
+      await UnSuspensionHubMail.mail(
+        hubToUnsuspend.hubName,
+        hubToUnsuspend.email,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'Hub unsuspended successfully',
+        data: hubToUnsuspend,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error unsuspending hub: ${error.message}`);
+      throw new BadRequestException('Could not unsuspend hub');
     }
   }
 }
