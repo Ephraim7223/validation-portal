@@ -32,12 +32,12 @@ export class SignUpDto {
   phone: string;
 }
 
-export class LoginDto {
-  @IsNotEmpty()
-  @IsEmail()
-  email: string;
+// export class LoginDto {
+//   @IsNotEmpty()
+//   @IsEmail()
+//   email: string;
 
-  @IsNotEmpty()
-  @IsString()
-  password: string;
-}
+//   @IsNotEmpty()
+//   @IsString()
+//   password: string;
+// }

@@ -2,7 +2,7 @@ import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignInDto } from './dto';
 import { IResponse } from 'src/interfaces';
-import { LoginDto, SignUpDto } from './dto';
+// import { LoginDto, SignUpDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -14,16 +14,16 @@ export class AuthController {
     return await this.authService.signIn(signInDto);
   }
 
-  @HttpCode(201)
-  @Post('sign-up')
-  async signUp(@Body() signupDto: SignUpDto): Promise<IResponse> {
-    const response = await this.authService.createUser(signupDto);
-    return response;
-  }
+  // @HttpCode(201)
+  // @Post('sign-up')
+  // async signUp(@Body() signupDto: SignUpDto): Promise<IResponse> {
+  //   const response = await this.authService.createUser(signupDto);
+  //   return response;
+  // }
 
-  @HttpCode(200)
-  @Post('log-in')
-  async logIn(@Body() loginDto: LoginDto): Promise<IResponse> {
-    return await this.authService.userLogIn(loginDto);
-  }
+  // @HttpCode(200)
+  // @Post('log-in')
+  // async logIn(@Body() loginDto: LoginDto): Promise<IResponse> {
+  //   return await this.authService.userLogIn(loginDto);
+  // }
 }
