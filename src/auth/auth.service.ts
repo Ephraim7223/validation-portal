@@ -73,19 +73,14 @@ export class AuthService {
         throw new UnauthorizedException('Invalid login credentials');
       }
 
-      // if (admin.role !== 'admin') {
-      //   throw new UnauthorizedException(
-      //     'Unauthorized: User does not have admin role',
-      //   );
-      // }
-
+      // Generate access token with user ID and role
       const accessToken = JwtHelper.signToken(admin.id, admin.role);
 
       this.logger.log(`Admin signed in successfully`);
       return {
         statusCode: 200,
         message: 'Signed in successfully',
-        data: accessToken,
+        data: { accessToken, role: admin.role }, // Return both token and role
         error: null,
       };
     } catch (error) {
