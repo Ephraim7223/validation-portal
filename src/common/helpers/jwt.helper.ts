@@ -8,13 +8,14 @@ export class JwtHelper {
     });
 
     const payload = {
-      sub: sub,
-      role: role,
+      sub,
+      role,
     };
+
     const token = jwtService.sign(payload, { expiresIn: '7d' });
 
     return {
-      token: token,
+      token,
     };
   }
 
@@ -22,11 +23,12 @@ export class JwtHelper {
     const jwtService = new JwtService({
       secret: process.env.JWT_ACCESS_SECRET,
     });
+
     try {
-      jwtService.verify(token);
+      return jwtService.verify(token);
     } catch (error) {
       throw new UnauthorizedException(
-        `This OTP is inavlid or expired, request for another one ${error}`,
+        `This token is invalid or expired, request a new one: ${error.message}`,
       );
     }
   }

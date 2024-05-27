@@ -19,9 +19,8 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-// import { User } from 'src/users/schema';
 import { JwtGuard } from 'src/guards';
-
+// import { User } from 'src/users/schema';
 @Controller('hubs')
 export class HubsController {
   constructor(private readonly hubsService: HubService) {}
@@ -70,17 +69,14 @@ export class HubsController {
 
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtGuard) // Protect the route with JWT authentication
-  @Post('register')
+  @Post('register-user')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
-    @UploadedFiles(new FileValidationPipe())
-    file: {
-      profilePic: Express.Multer.File;
-    },
+    @UploadedFiles() file: { profilePic: Express.Multer.File },
     @Body() createUserDto: CreateUserDto,
-    @Req() req: any, // Inject the request object to access the JWT token
+    @Req() req: any,
   ) {
-    console.log('Received files:', file);
+    const hubId = req.hub._id;
     if (!file.profilePic) {
       return {
         statusCode: 400,
@@ -90,14 +86,7 @@ export class HubsController {
       };
     }
 
-    const token = req.headers.authorization.split(' ')[1]; // Extract the JWT token
-    const newUser = await this.hubsService.createUser(
-      {
-        ...createUserDto,
-        profilePic: file.profilePic,
-      },
-      token,
-    );
+    const newUser = await this.hubsService.createUser(createUserDto, hubId);
 
     if (!newUser || !newUser.statusCode) {
       return {
@@ -108,7 +97,12 @@ export class HubsController {
       };
     }
 
-    return responseFormatter(newUser);
+    return {
+      statusCode: newUser.statusCode,
+      message: newUser.message,
+      data: newUser.data,
+      error: newUser.error,
+    };
   }
 
   @HttpCode(HttpStatus.OK)

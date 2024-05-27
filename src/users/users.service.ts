@@ -173,4 +173,19 @@ export class UserService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+
+  async getUsersByRole(role: string) {
+    try {
+      const users = await this.userModel.find({ role }).populate('hub');
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: users,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving users by role: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 }

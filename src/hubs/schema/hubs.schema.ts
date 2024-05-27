@@ -44,6 +44,9 @@ export class Hub {
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] })
   hubs_users: Types.ObjectId[];
+
+  @Prop({ default: 'hub' })
+  role: string;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

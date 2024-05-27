@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './users.service';
@@ -16,6 +17,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
+import { JwtGuard } from 'src/guards';
 
 @Controller('users')
 export class UserController {
@@ -58,6 +60,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['hub']))
   @Get()
   async getAllUsers() {
     try {
@@ -106,6 +109,17 @@ export class UserController {
   async getUsersByHub(@Param('hubId') hubId: string) {
     try {
       const result = await this.userService.getUsersByHub(hubId);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('role/:role')
+  async getUsersByRole(@Param('role') role: string) {
+    try {
+      const result = await this.userService.getUsersByRole(role);
       return result;
     } catch (error) {
       throw new BadRequestException(error.message);

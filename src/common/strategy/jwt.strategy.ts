@@ -1,15 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { PassportStrategy } from '@nestjs/passport';
 import { Model } from 'mongoose';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Admin } from 'src/auth/schema';
+import { Hub } from 'src/hubs/schema/hubs.schema';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     config: ConfigService,
-    @InjectModel('User') private readonly userModel: Model<any>,
+    @InjectModel(Admin.name) private readonly adminModel: Model<Admin>,
+    @InjectModel(Hub.name) private readonly hubModel: Model<Hub>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -17,13 +20,20 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: { sub: string }) {
-    const user = await this.userModel.findOne({ _id: payload.sub });
+  async validate(payload: { sub: string; role: string }) {
+    let user;
 
-    if (!user === null) {
-      delete user.password;
+    if (payload.role === 'admin' || payload.role === 'Super-admin') {
+      user = await this.adminModel.findById(payload.sub).exec();
+    } else if (payload.role === 'hub') {
+      user = await this.hubModel.findById(payload.sub).exec();
     }
 
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    delete user.password; // Remove sensitive data
     return user;
   }
 }

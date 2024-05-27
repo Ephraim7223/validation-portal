@@ -14,7 +14,6 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { User } from 'src/users/schema';
 import { SuccessMail } from 'src/templates/success';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { JwtService } from '@nestjs/jwt';
 import { JwtHelper } from 'src/common/helpers';
 import { generateHubID } from 'src/functions/genrating-random-number';
 import { VerifiedMail } from 'src/templates/verified';
@@ -26,7 +25,6 @@ export class HubService {
   constructor(
     @InjectModel(Hub.name)
     private readonly hubModel: Model<Hub>,
-    private readonly jwtService: JwtService,
     private readonly cloudinary: CloudinaryService,
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -94,15 +92,15 @@ export class HubService {
     return response;
   }
 
-  async createUser(createUserDto: CreateUserDto, token: string) {
+  async createUser(createUserDto: CreateUserDto, hubId: string) {
     let response: any;
     const { email, NIN, phoneNumber } = createUserDto;
     const ninAsNumber = parseInt(NIN);
     const phoneNumberAsNumber = parseInt(phoneNumber);
 
     // Extract Hub ID from JWT token
-    const decodedToken = this.jwtService.decode(token) as any;
-    const hubId = decodedToken.hubId;
+    // const decodedToken = this.jwtService.decode(token) as any;
+    // const hubId = decodedToken.hubId;
 
     // Check if user with email already exists
     const existingUser = await this.userModel.findOne({ email });
@@ -176,12 +174,12 @@ export class HubService {
         throw new UnauthorizedException('Invalid password');
       }
 
-      const token = JwtHelper.signToken(hub.id, null);
+      const token = JwtHelper.signToken(hub.id, 'hub');
 
       return {
         statusCode: 200,
         message: 'Login successful',
-        data: { token },
+        data: token,
         error: null,
       };
     } catch (error) {

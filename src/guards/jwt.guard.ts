@@ -2,31 +2,30 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 export class JwtGuard extends AuthGuard('jwt') {
-  public handleRequest(err: unknown, user: any): any {
-    if (err || !user) {
-      throw (
-        err ||
-        new UnauthorizedException(
-          'Invalid or expired token: login to access this resource',
-        )
+  constructor(private roles: string[]) {
+    super();
+  }
+
+  public handleRequest(err: unknown, user: any) {
+    if (!user) {
+      throw new UnauthorizedException(
+        'Invalid or expired token: login to access this resource',
       );
     }
+
+    if (this.roles && !this.roles.includes(user.role)) {
+      throw new UnauthorizedException(
+        'You do not have permission to access this resource',
+      );
+    }
+
     return user;
   }
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
-    const canActivate = await super.canActivate(context);
-    if (!canActivate) {
-      return false;
-    }
+    await super.canActivate(context);
 
-    const request = context.switchToHttp().getRequest();
-    const { user } = request;
-
-    if (!user) {
-      throw new UnauthorizedException('No user found in request');
-    }
-
-    return true;
+    const { user } = context.switchToHttp().getRequest();
+    return user ? true : false;
   }
 }
