@@ -58,6 +58,8 @@ export class User {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' })
   hub: Hub;
+
+  createdAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

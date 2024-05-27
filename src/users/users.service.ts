@@ -11,6 +11,8 @@ import { Model } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { Hub } from 'src/hubs/schema/hubs.schema';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UserSuspensionMail } from 'src/templates/suspendedUserMail';
+import { UserUnSuspensionMail } from 'src/templates/unsuspendedUserMail';
 
 @Injectable()
 export class UserService {
@@ -230,6 +232,174 @@ export class UserService {
       };
     } catch (error) {
       this.logger.error(`Error retrieving users by role: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async suspendUser(id: string) {
+    try {
+      const userToSuspend = await this.userModel.findById(id).populate('hub');
+      if (!userToSuspend) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (!userToSuspend.isActive) {
+        throw new BadRequestException('User is already suspended');
+      }
+
+      userToSuspend.isActive = false;
+      const updatedUser = await userToSuspend.save();
+
+      const hubName = (userToSuspend.hub as any).hubName;
+
+      await UserSuspensionMail.mail(
+        updatedUser.firstName,
+        updatedUser.lastName,
+        updatedUser.email,
+        hubName, // Adjust this field based on your User schema
+      );
+
+      return {
+        statusCode: 200,
+        message: 'User suspended successfully',
+        data: updatedUser,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error suspending user: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async unSuspendUser(id: string) {
+    try {
+      const userToUnSuspend = await this.userModel.findById(id).populate('hub');
+      if (!userToUnSuspend) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (userToUnSuspend.isActive) {
+        throw new BadRequestException('User is not suspended');
+      }
+
+      userToUnSuspend.isActive = true;
+      const updatedUser = await userToUnSuspend.save();
+
+      const hubName = (userToUnSuspend.hub as any).hubName;
+
+      await UserUnSuspensionMail.mail(
+        updatedUser.firstName,
+        updatedUser.lastName,
+        hubName, // Adjust this field based on your User schema
+        updatedUser.email,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'User unsuspended successfully',
+        data: updatedUser,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error unsuspending user: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async getUsersCountByRoleAndMonth() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const roles = ['Intern', 'Private', 'Freelancer'];
+      const userCountsByRoleAndMonth = [];
+
+      for (const role of roles) {
+        const roleUsers = await this.userModel.find({
+          role,
+          createdAt: {
+            $gte: new Date(`${currentYear}-01-01`),
+            $lt: new Date(`${currentYear + 1}-01-01`),
+          },
+        });
+
+        const countsByMonth = Array.from({ length: 12 }, () => 0);
+
+        for (const user of roleUsers) {
+          const month = new Date(user.createdAt).getMonth();
+          countsByMonth[month]++;
+        }
+
+        userCountsByRoleAndMonth.push({
+          role,
+          countsByMonth,
+        });
+      }
+
+      return {
+        statusCode: 200,
+        message: 'User counts by role and month retrieved successfully',
+        data: userCountsByRoleAndMonth,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error fetching user counts by role and month: ${error.message}`,
+      );
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async search(query: string) {
+    try {
+      if (!query || query.trim() === '') {
+        throw new BadRequestException('Search query is required');
+      }
+
+      const searchResults = await this.userModel.find({
+        $or: [
+          { email: { $regex: query, $options: 'i' } },
+          { phoneNumber: { $regex: query, $options: 'i' } },
+          { NIN: { $regex: query, $options: 'i' } },
+          { role: { $regex: query, $options: 'i' } },
+          { Stack: { $regex: query, $options: 'i' } },
+          { userID: { $regex: query, $options: 'i' } },
+          { organisation: { $regex: query, $options: 'i' } },
+          { firstName: { $regex: query, $options: 'i' } },
+          { lastName: { $regex: query, $options: 'i' } },
+        ],
+      });
+
+      return {
+        statusCode: 200,
+        message: 'Search results retrieved successfully',
+        data: searchResults,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error searching users: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async getStacksCount() {
+    try {
+      const userStacks = await this.userModel.find().select('Stack').exec();
+      const stackCounts = userStacks.reduce((counts, user) => {
+        const stack = user.Stack;
+        if (!counts[stack]) {
+          counts[stack] = 0;
+        }
+        counts[stack]++;
+        return counts;
+      }, {});
+
+      return {
+        statusCode: 200,
+        message: 'Stacks count retrieved successfully',
+        data: stackCounts,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error fetching stacks count: ${error.message}`);
       throw new BadRequestException('Internal Server Error');
     }
   }

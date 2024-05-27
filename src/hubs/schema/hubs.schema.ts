@@ -47,6 +47,9 @@ export class Hub {
 
   @Prop({ default: 'hub' })
   role: string;
+
+  @Prop({ default: false })
+  isPaid: boolean;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

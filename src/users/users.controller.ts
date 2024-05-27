@@ -7,7 +7,9 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -124,5 +126,33 @@ export class UserController {
     } catch (error) {
       throw new BadRequestException(error.message);
     }
+  }
+
+  @Patch('suspend/:id')
+  async suspendUser(@Param('id') id: string) {
+    return await this.userService.suspendUser(id);
+  }
+
+  @Patch('unsuspend/:id')
+  async unSuspendUser(@Param('id') id: string) {
+    return await this.userService.unSuspendUser(id);
+  }
+
+  @Get('stacks/count')
+  async getStacksCount() {
+    return await this.userService.getStacksCount();
+  }
+
+  @Get('count-by-role-and-month')
+  async getUsersCountByRoleAndMonth() {
+    return await this.userService.getUsersCountByRoleAndMonth();
+  }
+
+  @Get('search')
+  async search(@Query('query') query: string) {
+    if (!query || query.trim() === '') {
+      throw new BadRequestException('Search query is required');
+    }
+    return await this.userService.search(query);
   }
 }

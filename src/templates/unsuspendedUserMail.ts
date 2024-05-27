@@ -5,7 +5,7 @@ export class UserUnSuspensionMail {
   static async mail(
     firstName: string,
     lastName: string,
-    organisation: string,
+    hub: string,
     email: string,
   ) {
     const html = {
@@ -13,7 +13,7 @@ export class UserUnSuspensionMail {
         signature: false,
         greeting: `Dear ${firstName} ${lastName}`,
         intro: [
-          `We are writing to inform you that your account with ${organisation} has been reactivated.`,
+          `We are writing to inform you that your account with ${hub} has been reactivated.`,
           `If you have any questions or need further assistance, please contact us at .`,
         ],
       },

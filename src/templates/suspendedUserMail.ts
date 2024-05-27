@@ -5,7 +5,7 @@ export class UserSuspensionMail {
   static async mail(
     firstName: string,
     lastName: string,
-    organisation: string,
+    hub: string,
     email: string,
   ) {
     const html = {
@@ -13,8 +13,8 @@ export class UserSuspensionMail {
         signature: false,
         greeting: `Dear ${firstName} ${lastName}`,
         intro: [
-          `We are writing to inform you that your account with ${organisation} has been suspended till further notice.`,
-          `If you have any questions or need further assistance, please contact your organisation.`,
+          `We are writing to inform you that your account with ${hub} has been suspended till further notice.`,
+          `If you have any questions or need further assistance, please contact your hub.`,
         ],
       },
     };
