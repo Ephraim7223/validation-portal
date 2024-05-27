@@ -13,6 +13,7 @@ import { Hub } from 'src/hubs/schema/hubs.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserSuspensionMail } from 'src/templates/suspendedUserMail';
 import { UserUnSuspensionMail } from 'src/templates/unsuspendedUserMail';
+import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 
 @Injectable()
 export class UserService {
@@ -102,6 +103,13 @@ export class UserService {
         hubRecord.hubs_users.push(newUser._id);
         await hubRecord.save();
       }
+
+      this.logger.log(`sending successful application email`);
+      await ApplicationMail.mail(
+        newUser.firstName,
+        newUser.lastName,
+        newUser.email,
+      );
 
       response = {
         statusCode: 201,
