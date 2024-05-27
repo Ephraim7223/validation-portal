@@ -158,11 +158,11 @@ export class HubService {
         throw new UnauthorizedException('Invalid hubId');
       }
 
-      if (!hub.isVerified) {
+      if (hub.isVerified === false) {
         throw new UnauthorizedException('Account not verified');
       }
 
-      if (hub.isSuspended) {
+      if (hub.isSuspended === true) {
         throw new UnauthorizedException('Account is suspended');
       }
 
