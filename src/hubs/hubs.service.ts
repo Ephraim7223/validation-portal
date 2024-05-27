@@ -169,7 +169,7 @@ export class HubService {
         throw new UnauthorizedException('Invalid password');
       }
 
-      const token = JwtHelper.signToken(hub.id, 'hub');
+      const token = JwtHelper.signToken(hub._id, hub.role);
 
       return {
         statusCode: 200,

@@ -2,7 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 export class JwtHelper {
-  static signToken(sub: string, role: string): { token: string } {
+  static signToken(sub: any, role: string): { token: string } {
     const jwtService = new JwtService({
       secret: process.env.JWT_ACCESS_SECRET,
     });

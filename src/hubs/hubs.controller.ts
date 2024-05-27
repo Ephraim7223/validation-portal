@@ -76,7 +76,7 @@ export class HubsController {
     @Body() createUserDto: CreateUserDto,
     @Req() req,
   ) {
-    const hubId = req.user.hub._id; // Extract hub ID from JWT payload
+    const hubId = req.hub._id; // Extract hub ID from JWT payload
     if (!file.profilePic) {
       return {
         statusCode: 400,

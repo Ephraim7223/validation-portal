@@ -6,7 +6,7 @@ export const mailGenerator = new Mailgen({
   product: {
     name: 'PLACEDEV PORTAL',
     link: 'https://placedevportal.org/',
-    logo: 'https://res.cloudinary.com/nhubnacademy/image/upload/v1694827989/foundation_x0lse4.png',
+    logo: 'https://res.cloudinary.com/dvikxcdh3/image/upload/v1716814797/pictda_asm3qg.png    ',
     logoHeight: '100px',
   },
 });
