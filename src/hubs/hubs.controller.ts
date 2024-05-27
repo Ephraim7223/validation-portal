@@ -9,6 +9,9 @@ import {
   UseGuards,
   Req,
   Get,
+  BadRequestException,
+  Param,
+  Patch,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
@@ -118,5 +121,16 @@ export class HubsController {
   @Get()
   async getAllHubs() {
     return this.hubsService.getAllHubs();
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Patch('verify/:id')
+  async verifyHub(@Param('id') id: string) {
+    try {
+      const result = await this.hubsService.verifyHub(id);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
@@ -16,6 +17,7 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { JwtService } from '@nestjs/jwt';
 import { JwtHelper } from 'src/common/helpers';
 import { generateHubID } from 'src/functions/genrating-random-number';
+import { VerifiedMail } from 'src/templates/verified';
 
 @Injectable()
 export class HubService {
@@ -161,7 +163,7 @@ export class HubService {
         throw new UnauthorizedException('Invalid hubId');
       }
 
-      if (hub.isVerified === 'false') {
+      if (!hub.isVerified) {
         throw new UnauthorizedException('Account not verified');
       }
 
@@ -200,6 +202,42 @@ export class HubService {
     } catch (error) {
       this.logger.error(`Error retrieving hubs: ${error.message}`);
       throw new BadRequestException('Could not retrieve hubs');
+    }
+  }
+
+  async verifyHub(id: string) {
+    try {
+      const hubToUpdate = await this.hubModel.findById(id);
+      if (!hubToUpdate) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      if (hubToUpdate.isVerified === 'true') {
+        throw new BadRequestException('Hub is already verified');
+      }
+
+      hubToUpdate.isVerified = 'true';
+      const updatedHub = await hubToUpdate.save();
+
+      if (!updatedHub) {
+        throw new BadRequestException('Error updating hub');
+      }
+
+      await VerifiedMail.mail(
+        updatedHub.email,
+        updatedHub.hubName,
+        updatedHub.hubId,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'Hub verification successful',
+        data: updatedHub,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error verifying hub: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
     }
   }
 }
