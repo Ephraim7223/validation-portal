@@ -1,4 +1,14 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
+import { IsApproved, IsCalledForInterview } from '../schema/enums';
 
 export class CreateUserDto {
   @IsString()
@@ -101,15 +111,34 @@ export class ApproveUserDto {
 }
 
 export class ScheduleInterviewDto {
-  @IsString()
+  @ValidateIf((o) => o.interviewTime)
+  @IsDateString()
   @IsNotEmpty()
-  interviewDate: string;
+  interviewDate: Date;
 
+  @ValidateIf((o) => o.interviewDate)
   @IsString()
   @IsNotEmpty()
   interviewTime: string;
 
   @IsString()
+  @IsOptional()
+  interview_location: string;
+
+  @IsEnum(IsCalledForInterview)
+  @ValidateIf((o) => o.interviewTime && o.interviewDate)
   @IsNotEmpty()
-  interviewLocation: string;
+  isCalledForInterview: string;
+
+  @IsEnum(IsApproved)
+  @IsOptional()
+  isApproved: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isStarted: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isFinished: boolean;
 }

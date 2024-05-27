@@ -67,6 +67,15 @@ export class User {
   isCalledForInterview: string;
 
   @Prop({})
+  interview_location: string;
+
+  @Prop({})
+  interviewTime: string;
+
+  @Prop({})
+  interviewDate: Date;
+
+  @Prop({})
   start_date: string;
 
   @Prop({})

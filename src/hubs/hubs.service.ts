@@ -14,7 +14,10 @@ import { Hub } from './schema/hubs.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { User } from 'src/users/schema';
 import { SuccessMail } from 'src/templates/success';
-import { ApproveUserDto } from 'src/users/dto/create-user.dto';
+import {
+  ApproveUserDto,
+  ScheduleInterviewDto,
+} from 'src/users/dto/create-user.dto';
 import { JwtHelper } from 'src/common/helpers';
 import {
   generateHubID,
@@ -24,6 +27,7 @@ import { VerifiedMail } from 'src/templates/verified';
 import { SuspensionMail } from 'src/templates/suspensionMail';
 import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
+import { InterviewMail } from 'src/templates/interviewMail';
 
 @Injectable()
 export class HubService {
@@ -168,11 +172,12 @@ export class HubService {
           lastName: newUser.lastName,
           phoneNumber: newUser.phoneNumber,
           NIN: newUser.NIN,
-          D_O_B: newUser.D_O_B,
+          // D_O_B: newUser.D_O_B,
+          age: newUser.age,
           gender: newUser.gender,
           Stack: newUser.Stack,
           role: newUser.role,
-          // hub: hubRecord.hubName,
+          hub: newUser.hub.hubName,
         };
 
         const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
@@ -233,7 +238,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Login successful',
-        data: token,
+        data: { token, hub: hub },
         error: null,
       };
     } catch (error) {
@@ -534,5 +539,74 @@ export class HubService {
       };
     }
     return response;
+  }
+
+  async scheduleInterview(userId: string, interviewDto: ScheduleInterviewDto) {
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      this.logger.log(
+        `Checking if the user is already scheduled for an interview...`,
+      );
+      if (user.isCalledForInterview === 'done') {
+        throw new BadRequestException(
+          'User is already scheduled for an interview',
+        );
+      }
+
+      if (
+        (interviewDto.interviewDate && !interviewDto.interviewTime) ||
+        (!interviewDto.interviewDate && interviewDto.interviewTime)
+      ) {
+        return {
+          statusCode: 400,
+          message:
+            'Both a valid date and time are required for an interview call',
+          data: null,
+          error: null,
+        };
+      }
+
+      // Fetch hub details based on the user's chosen hub
+      const hub = await this.hubModel.findById(user.hub);
+      if (!hub) {
+        throw new BadRequestException('Hub not found');
+      }
+
+      const interviewLocation = hub.address;
+
+      this.logger.log(`Updating user data with interview details...`);
+      user.isCalledForInterview = 'done';
+      user.interviewDate = interviewDto.interviewDate;
+      user.interviewTime = interviewDto.interviewTime;
+      user.interview_location = interviewLocation;
+
+      await user.save();
+
+      this.logger.log(`Sending interview email to user...`);
+      await InterviewMail.mail(
+        user.email,
+        user.firstName,
+        user.lastName,
+        user.interviewDate,
+        user.interviewTime,
+        interviewLocation,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'Interview scheduled successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error scheduling interview for user ${userId}: ${error.message}`,
+      );
+      throw new BadRequestException('Could not schedule interview');
+    }
   }
 }
