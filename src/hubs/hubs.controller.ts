@@ -19,7 +19,8 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { JwtGuard } from 'src/guards';
+import { JwtGuard, RolesGuard } from 'src/guards';
+import { AllowedRoles, Role } from 'src/decorator';
 // import { User } from 'src/users/schema';
 @Controller('hubs')
 export class HubsController {
@@ -112,6 +113,8 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @AllowedRoles(Role.superAdmin)
+  @UseGuards(new JwtGuard(['Super-admin']), RolesGuard)
   @Get()
   async getAllHubs() {
     return this.hubsService.getAllHubs();
