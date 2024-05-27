@@ -18,7 +18,7 @@ export class SuccessMail {
     const template = mailGenerator.generate(html);
     const mail = {
       to: email,
-      subject: 'Congratulations on Your Acceptance!',
+      subject: 'Congratulations on Your Registration!',
       from: process.env.GMAIL_NAME,
       html: template,
     };
