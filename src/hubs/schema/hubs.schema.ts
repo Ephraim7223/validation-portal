@@ -36,11 +36,11 @@ export class Hub {
   @Prop({})
   hubId: string;
 
-  @Prop({})
+  @Prop({ default: false })
   isSuspended: boolean;
 
-  @Prop({})
-  isVerified: string;
+  @Prop({ default: false })
+  isVerified: boolean;
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] })
   hubs_users: Types.ObjectId[];

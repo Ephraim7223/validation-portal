@@ -98,10 +98,6 @@ export class HubService {
     const ninAsNumber = parseInt(NIN);
     const phoneNumberAsNumber = parseInt(phoneNumber);
 
-    // Extract Hub ID from JWT token
-    // const decodedToken = this.jwtService.decode(token) as any;
-    // const hubId = decodedToken.hubId;
-
     // Check if user with email already exists
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
@@ -150,7 +146,6 @@ export class HubService {
       }
     }
 
-    this.logger.log(response);
     return response;
   }
 
@@ -210,11 +205,11 @@ export class HubService {
         throw new NotFoundException('Hub not found');
       }
 
-      if (hubToUpdate.isVerified === 'true') {
+      if (hubToUpdate.isVerified === true) {
         throw new BadRequestException('Hub is already verified');
       }
 
-      hubToUpdate.isVerified = 'true';
+      hubToUpdate.isVerified = true;
       const updatedHub = await hubToUpdate.save();
 
       if (!updatedHub) {

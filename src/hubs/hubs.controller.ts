@@ -68,15 +68,15 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtGuard) // Protect the route with JWT authentication
+  @UseGuards(new JwtGuard(['hub'])) // Protect the route with JWT authentication
   @Post('register-user')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
     @UploadedFiles() file: { profilePic: Express.Multer.File },
     @Body() createUserDto: CreateUserDto,
-    @Req() req: any,
+    @Req() req,
   ) {
-    const hubId = req.hub._id;
+    const hubId = req.user.hub._id; // Extract hub ID from JWT payload
     if (!file.profilePic) {
       return {
         statusCode: 400,

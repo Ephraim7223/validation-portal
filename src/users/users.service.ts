@@ -1,3 +1,4 @@
+import * as QRCode from 'qrcode';
 import {
   BadRequestException,
   Injectable,
@@ -75,6 +76,25 @@ export class UserService {
         phoneNumber: phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
       });
+
+      // Generate QR code with user details
+      const userDetails = {
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        phoneNumber: newUser.phoneNumber,
+        NIN: newUser.NIN,
+        D_O_B: newUser.D_O_B,
+        gender: newUser.gender,
+        Stack: newUser.Stack,
+        role: newUser.role,
+        hub: hubRecord.hubName,
+      };
+
+      const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
+      newUser.qrcode = qrCodeData;
+      await newUser.save();
+
       // Update hubs_users field in hubRecord
       if (!hubRecord.hubs_users.includes(newUser._id)) {
         hubRecord.hubs_users.push(newUser._id);
@@ -128,10 +148,21 @@ export class UserService {
 
   async deleteUser(id: string) {
     try {
-      const user = await this.userModel.findByIdAndDelete(id);
+      // Find the user to get the related hub ID
+      const user = await this.userModel.findById(id);
       if (!user) {
         throw new NotFoundException('User not found');
       }
+
+      // Delete the user
+      await this.userModel.findByIdAndDelete(id);
+
+      // Update the hub to remove the user ID from hubs_users
+      await this.hubModel.updateOne(
+        { _id: user.hub },
+        { $pull: { hubs_users: user._id } },
+      );
+
       return {
         statusCode: 200,
         message: 'User deleted successfully',
@@ -146,7 +177,21 @@ export class UserService {
 
   async deleteAllUsers() {
     try {
+      // Get all users to find the related hub IDs
+      const users = await this.userModel.find({});
+      const userIDs = users.map((user) => user._id);
+      const hubIDs = users.map((user) => user.hub);
+
+      // Delete all users
       const result = await this.userModel.deleteMany({});
+
+      // Update all hubs to remove the user IDs from hubs_users
+      await this.hubModel.updateMany(
+        { _id: { $in: hubIDs } },
+        { $pull: { hubs_users: { $in: userIDs } } },
+        { multi: true },
+      );
+
       return {
         statusCode: 200,
         message: 'All users deleted successfully',
