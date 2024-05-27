@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Param,
   Patch,
+  Delete,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
@@ -129,5 +130,15 @@ export class HubsController {
     } catch (error) {
       throw new BadRequestException(error.message);
     }
+  }
+
+  @Get(':id')
+  async getSingleHub(@Param('id') id: string) {
+    return this.hubsService.getSingleHub(id);
+  }
+
+  @Delete(':id')
+  async deleteHub(@Param('id') id: string) {
+    return this.hubsService.deleteHub(id);
   }
 }

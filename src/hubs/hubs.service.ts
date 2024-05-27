@@ -233,4 +233,44 @@ export class HubService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+
+  async getSingleHub(id: string) {
+    try {
+      const hub = await this.hubModel.findById(id).populate('hubs_users');
+      if (!hub) {
+        throw new NotFoundException('Hub not found');
+      }
+      return {
+        statusCode: 200,
+        message: 'Hub retrieved successfully',
+        data: hub,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving single hub: ${error.message}`);
+      throw new BadRequestException('Could not retrieve hub');
+    }
+  }
+
+  async deleteHub(id: string) {
+    try {
+      const hubToDelete = await this.hubModel.findById(id);
+      if (!hubToDelete) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      // Delete hub
+      await hubToDelete.deleteOne();
+
+      return {
+        statusCode: 200,
+        message: 'Hub deleted successfully',
+        data: null,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error deleting hub: ${error.message}`);
+      throw new BadRequestException('Could not delete hub');
+    }
+  }
 }
