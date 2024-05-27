@@ -4,6 +4,7 @@ import { HubsController } from './hubs.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/users/schema';
 import { Hub, HubSchema } from './schema/hubs.schema';
+import { JwtService } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { Hub, HubSchema } from './schema/hubs.schema';
     ]),
   ],
   controllers: [HubsController],
-  providers: [HubService],
+  providers: [HubService, JwtService],
 })
 export class HubsModule {}

@@ -34,7 +34,7 @@ export class Hub {
   CAC: string;
 
   @Prop({})
-  hubID: string;
+  hubId: string;
 
   @Prop({})
   isSuspended: boolean;

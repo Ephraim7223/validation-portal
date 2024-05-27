@@ -29,3 +29,13 @@ export class CreateHubDto {
 
   CAC: Express.Multer.File;
 }
+
+export class SignInDto {
+  @IsNotEmpty()
+  @IsString()
+  hubId: string;
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
+}

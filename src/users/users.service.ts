@@ -46,17 +46,15 @@ export class UserService {
       };
     } else {
       this.logger.log(`Checking if hub exists...`);
-      const hubRecord = await this.hubModel.findOne({
-        hubName: hub,
-      });
+      const hubRecord = await this.hubModel.findOne({ hubName: hub });
       if (!hubRecord) {
         throw new BadRequestException('Hub does not exist.');
       }
+
       this.logger.log(`Uploading profile-picture to cloud...`);
       const profilePic = await this.cloudinary.upload(
         createUserDto.profilePic[0],
       );
-
       delete createUserDto.profilePic;
 
       const userCount = await this.userModel.countDocuments({
@@ -64,6 +62,7 @@ export class UserService {
       });
       await this.hubModel.updateOne({ _id: hubRecord._id }, { userCount });
 
+      this.logger.log(`Creating new user...`);
       const newUser = await this.userModel.create({
         ...createUserDto,
         hub: hubRecord._id,
@@ -71,6 +70,11 @@ export class UserService {
         phoneNumber: phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
       });
+      // Update hubs_users field in hubRecord
+      if (!hubRecord.hubs_users.includes(newUser._id)) {
+        hubRecord.hubs_users.push(newUser._id);
+        await hubRecord.save();
+      }
 
       response = {
         statusCode: 201,
