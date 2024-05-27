@@ -24,6 +24,7 @@ import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import {
   ApproveUserDto,
+  ScheduleInterviewDto,
   // ApproveUserDto,
   // ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
@@ -32,6 +33,7 @@ import { JwtGuard } from 'src/guards';
 // import { User } from 'src/users/schema';
 @Controller('hubs')
 export class HubsController {
+  logger: any;
   constructor(private readonly hubsService: HubService) {}
 
   @HttpCode(HttpStatus.OK)
@@ -81,11 +83,12 @@ export class HubsController {
   @Post('register-user')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
-    @UploadedFiles() file: { profilePic: Express.Multer.File },
+    @UploadedFiles(new FileValidationPipe())
+    file: { profilePic: Express.Multer.File },
     @Body() createUserDto: ApproveUserDto,
     @Req() req,
   ) {
-    const hubId = req.user.hubId;
+    const hubId = req.user._id; // assuming the JWT contains the hub ID
     if (!file.profilePic) {
       return {
         statusCode: 400,
@@ -95,16 +98,13 @@ export class HubsController {
       };
     }
 
-    const newUser = await this.hubsService.createUser(createUserDto, hubId);
-
-    if (!newUser || !newUser.statusCode) {
-      return {
-        statusCode: 500,
-        message: 'Internal server error',
-        data: null,
-        error: null,
-      };
-    }
+    const newUser = await this.hubsService.createUser(
+      {
+        ...createUserDto,
+        profilePic: file.profilePic,
+      },
+      hubId,
+    );
 
     return {
       statusCode: newUser.statusCode,
@@ -204,5 +204,31 @@ export class HubsController {
     const hubId = req.hub;
     const response = await this.hubsService.approveUser(userId, hubId);
     return response;
+  }
+
+  @UseGuards(JwtGuard)
+  @Post('schedule/:id')
+  async scheduleInterview(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() interviewDto: ScheduleInterviewDto,
+  ) {
+    const hubId = req.user.hubId; // assuming the JWT contains the hub ID
+    try {
+      const result = await this.hubsService.scheduleInterview(
+        id,
+        hubId,
+        interviewDto,
+      );
+      return {
+        statusCode: result.statusCode,
+        message: result.message,
+        data: result.data,
+        error: result.error,
+      };
+    } catch (error) {
+      this.logger.error(`Error scheduling interview: ${error.message}`);
+      throw new BadRequestException('Could not schedule interview');
+    }
   }
 }

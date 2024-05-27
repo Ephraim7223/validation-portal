@@ -50,6 +50,7 @@ export class Hub {
 
   @Prop({ default: false })
   isPaid: boolean;
+  _id: any;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

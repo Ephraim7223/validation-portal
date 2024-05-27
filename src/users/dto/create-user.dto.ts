@@ -31,13 +31,13 @@ export class CreateUserDto {
   @IsNotEmpty()
   NIN: string;
 
-  @IsDateString()
-  @IsNotEmpty()
-  start_date: Date;
+  // @IsDateString()
+  // @IsNotEmpty()
+  // start_date: Date;
 
-  @IsDateString()
-  @IsNotEmpty()
-  end_date: Date;
+  // @IsDateString()
+  // @IsNotEmpty()
+  // end_date: Date;
 
   @IsString()
   @IsNotEmpty()

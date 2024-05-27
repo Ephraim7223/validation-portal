@@ -28,6 +28,7 @@ import { SuspensionMail } from 'src/templates/suspensionMail';
 import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
+import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 
 @Injectable()
 export class HubService {
@@ -105,7 +106,7 @@ export class HubService {
 
   async createUser(createUserDto: ApproveUserDto, hubId: string) {
     let response: any;
-    const { email, NIN, phoneNumber, D_O_B, profilePic } = createUserDto;
+    const { email, NIN, phoneNumber, D_O_B } = createUserDto;
 
     const ninAsNumber = parseInt(NIN);
     if (isNaN(ninAsNumber)) {
@@ -143,16 +144,10 @@ export class HubService {
       };
     } else {
       try {
-        if (
-          !profilePic ||
-          !Array.isArray(profilePic) ||
-          profilePic.length === 0
-        ) {
-          return { message: 'Profile picture is required' };
-        }
-
-        // Upload profile picture to cloud
-        const profilePicUrl = await this.cloudinary.upload(profilePic[0]);
+        this.logger.log(`Uploading profile picture to cloud...`);
+        const profilePic = await this.cloudinary.upload(
+          createUserDto.profilePic[0],
+        );
         delete createUserDto.profilePic;
 
         // Create new user with Hub ID from JWT token
@@ -161,7 +156,7 @@ export class HubService {
           hub: hubId,
           NIN: ninAsNumber,
           phoneNumber: phoneNumberAsNumber,
-          profilePic: profilePicUrl.secure_url,
+          profilePic: profilePic.secure_url,
           age,
         });
 
@@ -172,12 +167,11 @@ export class HubService {
           lastName: newUser.lastName,
           phoneNumber: newUser.phoneNumber,
           NIN: newUser.NIN,
-          // D_O_B: newUser.D_O_B,
           age: newUser.age,
           gender: newUser.gender,
           Stack: newUser.Stack,
           role: newUser.role,
-          hub: newUser.hub.hubName,
+          hub: hubId,
         };
 
         const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
@@ -192,6 +186,13 @@ export class HubService {
         hub.hubs_users.push(newUser._id);
         await hub.save();
 
+        this.logger.log(`Sending successful application email`);
+        await ApplicationMail.mail(
+          newUser.firstName,
+          newUser.lastName,
+          newUser.email,
+        );
+
         response = {
           statusCode: 201,
           message: 'User saved successfully',
@@ -199,7 +200,6 @@ export class HubService {
           error: null,
         };
       } catch (error) {
-        console.log(error);
         this.logger.error('Error creating user', error);
         response = {
           statusCode: 500,
@@ -541,72 +541,79 @@ export class HubService {
     return response;
   }
 
-  async scheduleInterview(userId: string, interviewDto: ScheduleInterviewDto) {
-    try {
-      const user = await this.userModel.findById(userId);
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
+  async scheduleInterview(
+    id: string,
+    hubId: string,
+    interviewDto: ScheduleInterviewDto,
+  ) {
+    const user = await this.userModel.findById(id).populate('hub');
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
 
-      this.logger.log(
-        `Checking if the user is already scheduled for an interview...`,
+    if (user.hub && user.hub._id.toString() !== hubId) {
+      throw new BadRequestException('User does not belong to your hub');
+    }
+
+    this.logger.log(
+      `Checking if the user is already scheduled for an interview...`,
+    );
+    if (user.isCalledForInterview === 'done') {
+      throw new BadRequestException(
+        'User is already scheduled for an interview',
       );
-      if (user.isCalledForInterview === 'done') {
-        throw new BadRequestException(
-          'User is already scheduled for an interview',
-        );
-      }
+    }
 
-      if (
-        (interviewDto.interviewDate && !interviewDto.interviewTime) ||
-        (!interviewDto.interviewDate && interviewDto.interviewTime)
-      ) {
-        return {
-          statusCode: 400,
-          message:
-            'Both a valid date and time are required for an interview call',
-          data: null,
-          error: null,
-        };
-      }
-
-      // Fetch hub details based on the user's chosen hub
-      const hub = await this.hubModel.findById(user.hub);
-      if (!hub) {
-        throw new BadRequestException('Hub not found');
-      }
-
-      const interviewLocation = hub.address;
-
-      this.logger.log(`Updating user data with interview details...`);
-      user.isCalledForInterview = 'done';
-      user.interviewDate = interviewDto.interviewDate;
-      user.interviewTime = interviewDto.interviewTime;
-      user.interview_location = interviewLocation;
-
-      await user.save();
-
-      this.logger.log(`Sending interview email to user...`);
-      await InterviewMail.mail(
-        user.email,
-        user.firstName,
-        user.lastName,
-        user.interviewDate,
-        user.interviewTime,
-        interviewLocation,
-      );
-
+    if (
+      (interviewDto.interviewDate && !interviewDto.interviewTime) ||
+      (!interviewDto.interviewDate && interviewDto.interviewTime)
+    ) {
       return {
-        statusCode: 200,
-        message: 'Interview scheduled successfully',
-        data: user,
+        statusCode: 400,
+        message:
+          'Both a valid date and time are required for an interview call',
+        data: null,
         error: null,
       };
-    } catch (error) {
-      this.logger.error(
-        `Error scheduling interview for user ${userId}: ${error.message}`,
-      );
-      throw new BadRequestException('Could not schedule interview');
     }
+
+    // Fetch hub details based on the user's chosen hub
+    const hub = await this.hubModel.findById(user.hub);
+    if (!hub) {
+      throw new BadRequestException('Hub not found');
+    }
+
+    const interviewLocation = hub.address;
+
+    this.logger.log(`Updating user data with interview details...`);
+    user.isCalledForInterview = 'done';
+    user.interviewDate = interviewDto.interviewDate;
+    user.interviewTime = interviewDto.interviewTime;
+    user.interview_location = interviewLocation;
+
+    await user.save();
+
+    this.logger.log(`Sending interview email to user...`);
+    await InterviewMail.mail(
+      user.email,
+      user.firstName,
+      user.lastName,
+      user.interviewDate,
+      user.interviewTime,
+      interviewLocation,
+    );
+
+    return {
+      statusCode: 200,
+      message: 'Interview scheduled successfully',
+      data: user,
+      error: null,
+    };
+  }
+  catch(error) {
+    this.logger.error(
+      `Error scheduling interview for user ${User}: ${error.message}`,
+    );
+    throw new BadRequestException('Could not schedule interview');
   }
 }
