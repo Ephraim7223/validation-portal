@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schema';
 import { Model } from 'mongoose';
@@ -86,5 +91,86 @@ export class UserService {
 
     this.logger.log(response);
     return response;
+  }
+
+  async getAllUsers() {
+    try {
+      const users = await this.userModel.find().populate('hub');
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: users,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving users: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async getUserById(id: string) {
+    try {
+      const user = await this.userModel.findById(id).populate('hub');
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      return {
+        statusCode: 200,
+        message: 'User retrieved successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving user: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async deleteUser(id: string) {
+    try {
+      const user = await this.userModel.findByIdAndDelete(id);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      return {
+        statusCode: 200,
+        message: 'User deleted successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error deleting user: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async deleteAllUsers() {
+    try {
+      const result = await this.userModel.deleteMany({});
+      return {
+        statusCode: 200,
+        message: 'All users deleted successfully',
+        data: result,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error deleting all users: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async getUsersByHub(hubId: string) {
+    try {
+      const users = await this.userModel.find({ hub: hubId }).populate('hub');
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: users,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving users by hub: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
   }
 }

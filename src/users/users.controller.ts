@@ -1,8 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   UploadedFiles,
   UseInterceptors,
@@ -51,5 +55,60 @@ export class UserController {
     }
 
     return responseFormatter(newUser);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get()
+  async getAllUsers() {
+    try {
+      const result = await this.userService.getAllUsers();
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':id')
+  async getUserById(@Param('id') id: string) {
+    try {
+      const result = await this.userService.getUserById(id);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete(':id')
+  async deleteUser(@Param('id') id: string) {
+    try {
+      const result = await this.userService.deleteUser(id);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete()
+  async deleteAllUsers() {
+    try {
+      const result = await this.userService.deleteAllUsers();
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('hub/:hubId')
+  async getUsersByHub(@Param('hubId') hubId: string) {
+    try {
+      const result = await this.userService.getUsersByHub(hubId);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }
