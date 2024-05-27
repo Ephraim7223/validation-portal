@@ -1,3 +1,4 @@
+import * as QRCode from 'qrcode';
 import {
   BadRequestException,
   Injectable,
@@ -13,12 +14,16 @@ import { Hub } from './schema/hubs.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { User } from 'src/users/schema';
 import { SuccessMail } from 'src/templates/success';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { ApproveUserDto } from 'src/users/dto/create-user.dto';
 import { JwtHelper } from 'src/common/helpers';
-import { generateHubID } from 'src/functions/genrating-random-number';
+import {
+  generateHubID,
+  generateUserID,
+} from 'src/functions/genrating-random-number';
 import { VerifiedMail } from 'src/templates/verified';
 import { SuspensionMail } from 'src/templates/suspensionMail';
 import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
+import { AcceptanceMail } from 'src/templates/acceptanceMail';
 
 @Injectable()
 export class HubService {
@@ -94,11 +99,31 @@ export class HubService {
     return response;
   }
 
-  async createUser(createUserDto: CreateUserDto, hubId: string) {
+  async createUser(createUserDto: ApproveUserDto, hubId: string) {
     let response: any;
-    const { email, NIN, phoneNumber } = createUserDto;
+    const { email, NIN, phoneNumber, D_O_B, profilePic } = createUserDto;
+
     const ninAsNumber = parseInt(NIN);
+    if (isNaN(ninAsNumber)) {
+      return { message: 'Invalid NIN format' };
+    }
+
     const phoneNumberAsNumber = parseInt(phoneNumber);
+    if (isNaN(phoneNumberAsNumber)) {
+      return { message: 'Invalid phone number format' };
+    }
+
+    const parsedDOB = new Date(D_O_B);
+    if (isNaN(parsedDOB.getTime())) {
+      return { message: 'Invalid date of birth format' };
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - parsedDOB.getFullYear();
+    const m = today.getMonth() - parsedDOB.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
+      age--;
+    }
 
     // Check if user with email already exists
     const existingUser = await this.userModel.findOne({ email });
@@ -114,20 +139,45 @@ export class HubService {
       };
     } else {
       try {
+        if (
+          !profilePic ||
+          !Array.isArray(profilePic) ||
+          profilePic.length === 0
+        ) {
+          return { message: 'Profile picture is required' };
+        }
+
         // Upload profile picture to cloud
-        const profilePic = await this.cloudinary.upload(
-          createUserDto.profilePic[0],
-        );
+        const profilePicUrl = await this.cloudinary.upload(profilePic[0]);
         delete createUserDto.profilePic;
 
         // Create new user with Hub ID from JWT token
         const newUser = await this.userModel.create({
           ...createUserDto,
-          hub: hubId, // Assigning Hub ID from JWT token
+          hub: hubId,
           NIN: ninAsNumber,
           phoneNumber: phoneNumberAsNumber,
-          profilePic: profilePic.secure_url,
+          profilePic: profilePicUrl.secure_url,
+          age,
         });
+
+        // Update user details
+        const userDetails = {
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          phoneNumber: newUser.phoneNumber,
+          NIN: newUser.NIN,
+          D_O_B: newUser.D_O_B,
+          gender: newUser.gender,
+          Stack: newUser.Stack,
+          role: newUser.role,
+          // hub: hubRecord.hubName,
+        };
+
+        const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
+        newUser.qrcode = qrCodeData;
+        await newUser.save();
 
         // Update hubs_users field in Hub model
         const hub = await this.hubModel.findById(hubId);
@@ -144,7 +194,14 @@ export class HubService {
           error: null,
         };
       } catch (error) {
-        throw new UnauthorizedException('Hub not found');
+        console.log(error);
+        this.logger.error('Error creating user', error);
+        response = {
+          statusCode: 500,
+          message: 'Internal server error',
+          data: null,
+          error,
+        };
       }
     }
 
@@ -331,5 +388,151 @@ export class HubService {
       this.logger.error(`Error unsuspending hub: ${error.message}`);
       throw new BadRequestException('Could not unsuspend hub');
     }
+  }
+
+  async getUsersUnderHub(hubId: string) {
+    try {
+      const hub = await this.hubModel.findById(hubId).populate('hubs_users');
+      if (!hub) {
+        throw new NotFoundException('Hub not found');
+      }
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: hub.hubs_users,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving users for hub ${hubId}: ${error.message}`,
+      );
+      throw new BadRequestException('Could not retrieve users');
+    }
+  }
+
+  async getSingleUser(hubId: string, userId: string) {
+    try {
+      // Find the user by ID and ensure it belongs to the requesting hub
+      const user = await this.userModel.findOne({ _id: userId, hub: hubId });
+      if (!user) {
+        throw new NotFoundException(
+          'User not found or does not belong to this hub',
+        );
+      }
+      return {
+        statusCode: 200,
+        message: 'User retrieved successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving user ${userId} for hub ${hubId}: ${error.message}`,
+      );
+      throw new BadRequestException('Could not retrieve user');
+    }
+  }
+
+  async approveUser(userId: string, hub: string) {
+    let response: any;
+
+    const user = await this.userModel.findOne({
+      _id: userId,
+      hubId: hub,
+    });
+
+    if (!user) {
+      return (response = {
+        statusCode: 404,
+        message:
+          'No user found with this id or the user does not belong to this hub',
+        data: null,
+        error: null,
+      });
+    }
+
+    if (user.isDeleted) {
+      return (response = {
+        statusCode: 400,
+        message: 'Cannot approve a deleted user',
+        data: null,
+        error: null,
+      });
+    }
+
+    try {
+      const {
+        email,
+        firstName,
+        lastName,
+        start_date,
+        end_date,
+        Stack,
+        hub,
+        role,
+      } = user;
+
+      // Validate start_date and end_date
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return (response = {
+          statusCode: 400,
+          message: 'Invalid start date or end date',
+          data: null,
+          error: null,
+        });
+      }
+
+      // Calculate duration in days
+      const duration = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      // Generate userID
+      const userID = generateUserID(role); // Assuming there's a function to generate a userID
+
+      // Update the document with the generated userID and duration
+      user.userID = userID;
+      user.duration = duration;
+
+      // Send acceptance email
+      await AcceptanceMail.mail(
+        firstName,
+        lastName,
+        role,
+        userID,
+        email,
+        hub,
+        Stack,
+        duration,
+      );
+
+      user.isApproved = 'approved';
+      user.isCalledForInterview = 'done';
+      await user.save();
+
+      return (response = {
+        statusCode: 200,
+        message: `User approved successfully`,
+        data: null,
+        error: null,
+      });
+    } catch (err) {
+      console.log(err);
+
+      this.logger.log(
+        `Error updating user with id: [${userId}]: ` +
+          JSON.stringify(err, null, 2),
+      );
+
+      response = {
+        statusCode: 400,
+        message: 'An error occurred updating user',
+        data: null,
+        error: err,
+      };
+    }
+    return response;
   }
 }

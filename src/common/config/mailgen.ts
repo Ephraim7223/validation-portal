@@ -5,7 +5,7 @@ export const mailGenerator = new Mailgen({
   theme: 'default',
   product: {
     name: 'PLACEDEV PORTAL',
-    link: 'https://placedevportal.org/',
+    link: 'https://pdcvp.netlify.app/',
     logo: 'https://res.cloudinary.com/dvikxcdh3/image/upload/v1716814797/pictda_asm3qg.png    ',
     logoHeight: '100px',
   },

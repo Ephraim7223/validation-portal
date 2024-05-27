@@ -36,9 +36,29 @@ export class UserService {
 
   async register(createUserDto: CreateUserDto) {
     let response: any;
-    const { email, hub, NIN, phoneNumber } = createUserDto;
+    const { email, hub, NIN, phoneNumber, D_O_B } = createUserDto;
+
     const ninAsNumber = parseInt(NIN);
+    if (isNaN(ninAsNumber)) {
+      return { message: 'Invalid NIN format' };
+    }
+
     const phoneNumberAsNumber = parseInt(phoneNumber);
+    if (isNaN(phoneNumberAsNumber)) {
+      return { message: 'Invalid phone number format' };
+    }
+
+    const parsedDOB = new Date(D_O_B);
+    if (isNaN(parsedDOB.getTime())) {
+      return { message: 'Invalid date of birth format' };
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - parsedDOB.getFullYear();
+    const m = today.getMonth() - parsedDOB.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
+      age--;
+    }
 
     this.logger.log('Looking for a user with an existing email');
     const existingUser = await this.userModel.findOne({ email });
@@ -78,6 +98,7 @@ export class UserService {
         NIN: ninAsNumber,
         phoneNumber: phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
+        age,
       });
 
       // Generate QR code with user details
@@ -104,7 +125,7 @@ export class UserService {
         await hubRecord.save();
       }
 
-      this.logger.log(`sending successful application email`);
+      this.logger.log(`Sending successful application email`);
       await ApplicationMail.mail(
         newUser.firstName,
         newUser.lastName,

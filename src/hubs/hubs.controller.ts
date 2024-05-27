@@ -15,13 +15,18 @@ import {
   Delete,
   NotFoundException,
   UnauthorizedException,
+  Put,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import {
+  ApproveUserDto,
+  // ApproveUserDto,
+  // ScheduleInterviewDto,
+} from 'src/users/dto/create-user.dto';
 import { JwtGuard } from 'src/guards';
 // import { AllowedRoles, Role } from 'src/decorator';
 // import { User } from 'src/users/schema';
@@ -72,15 +77,15 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(new JwtGuard(['hub'])) // Protect the route with JWT authentication
+  @UseGuards(JwtGuard) // Protect the route with JWT authentication
   @Post('register-user')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
     @UploadedFiles() file: { profilePic: Express.Multer.File },
-    @Body() createUserDto: CreateUserDto,
+    @Body() createUserDto: ApproveUserDto,
     @Req() req,
   ) {
-    const hubId = req.hub._id;
+    const hubId = req.user.hubId;
     if (!file.profilePic) {
       return {
         statusCode: 400,
@@ -174,5 +179,30 @@ export class HubsController {
         throw new UnauthorizedException('Could not unsuspend hub');
       }
     }
+  }
+
+  @UseGuards(JwtGuard)
+  @Get('users')
+  async getUsersUnderHub(@Req() req) {
+    const hubId = req.hub; // Extract hub ID from authenticated user
+    return this.hubsService.getUsersUnderHub(hubId);
+  }
+
+  @Get('users/:userId')
+  async getSingleUser(@Req() req, @Param('userId') userId: string) {
+    const hubId = req.user._id; // Extract hub ID from authenticated user
+    return this.hubsService.getSingleUser(hubId, userId);
+  }
+
+  @UseGuards(JwtGuard)
+  @Put('approve/:userId')
+  async approveUser(
+    @Param('userId') userId: string,
+    @Req() req,
+    // @Res() res: Response,
+  ) {
+    const hubId = req.hub;
+    const response = await this.hubsService.approveUser(userId, hubId);
+    return response;
   }
 }

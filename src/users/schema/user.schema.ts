@@ -49,12 +49,34 @@ export class User {
   @Prop({ default: false })
   isActiveMailSent: boolean;
 
+  @Prop({ default: false })
+  isPaid: boolean;
+
   @Prop({})
   userID: string;
 
   expiryDate: string;
 
+  @Prop({})
   duration: number;
+
+  @Prop({ enum: ['pending', 'approved', 'declined'], default: 'pending' })
+  isApproved: string;
+
+  @Prop({ enum: ['pending', 'called', 'done'], default: 'pending' })
+  isCalledForInterview: string;
+
+  @Prop({})
+  start_date: string;
+
+  @Prop({})
+  end_date: string;
+
+  @Prop({ type: Boolean, default: false })
+  isDeleted: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isTerminated: boolean;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' })
   hub: Hub;

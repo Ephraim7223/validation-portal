@@ -8,19 +8,21 @@ export class AcceptanceMail {
     role: string,
     userID: string,
     email: string,
-    organisation: string,
-    duration: string,
+    hub: any,
+    Stack: string,
+    duration: any,
   ) {
     const html = {
       body: {
         signature: false,
         greeting: `Dear ${firstName} ${lastName}`,
         intro: [
-          `Congratulations! We are pleased to inform you of your acceptance into ${organisation}.`,
+          `Congratulations! We are pleased to inform you of your acceptance into ${hub}.`,
           `Your ID number is: <b>${userID}</b>`,
           `<h2>Application Details</h2>`,
+          `Chosen Stack: ${Stack}`,
           `Registered Role: ${role}`,
-          `For a duration of ${duration} months`,
+          `For a duration of ${duration}`,
         ],
         outro: [
           'For further assistance and enquiries about your organisation`s activities, please do not hesitate to contact us.',
