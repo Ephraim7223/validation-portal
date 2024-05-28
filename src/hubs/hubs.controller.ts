@@ -240,4 +240,18 @@ export class HubsController {
     const hubId = req.user._id; // Assuming hubId is stored in the user property of the request object
     return this.hubsService.getUsersPendingInterview(hubId);
   }
+
+  @UseGuards(JwtGuard)
+  @Get('users/role/:role')
+  async getUsersByRole(@Param('role') role: string, @Req() req) {
+    const hubId = req.user._id;
+    return this.hubsService.getUsersByRole(role, hubId);
+  }
+
+  @UseGuards(JwtGuard)
+  @Get('stacks/count')
+  async getStacksCount(@Req() req) {
+    const hubId = req.user._id;
+    return this.hubsService.getStacksCount(hubId);
+  }
 }

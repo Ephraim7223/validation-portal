@@ -704,4 +704,49 @@ export class HubService {
       throw new BadRequestException('Could not retrieve user');
     }
   }
+
+  async getUsersByRole(role: string, hubId: any) {
+    try {
+      const users = await this.userModel
+        .find({ role, hub: hubId })
+        .populate('hub');
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: users,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving users by role: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  // Get the count of stacks within a specific hub
+  async getStacksCount(hubId: string) {
+    try {
+      const userStacks = await this.userModel
+        .find({ hub: hubId })
+        .select('Stack')
+        .exec();
+      const stackCounts = userStacks.reduce((counts, user) => {
+        const stack = user.Stack;
+        if (!counts[stack]) {
+          counts[stack] = 0;
+        }
+        counts[stack]++;
+        return counts;
+      }, {});
+
+      return {
+        statusCode: 200,
+        message: 'Stacks count retrieved successfully',
+        data: stackCounts,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(`Error fetching stacks count: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 }
