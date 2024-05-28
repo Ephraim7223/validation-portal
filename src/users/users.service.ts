@@ -251,9 +251,9 @@ export class UserService {
     }
   }
 
-  async getUsersByRole(role: string, hubId) {
+  async getUsersByRole(role: string) {
     try {
-      const users = await this.hubModel.find({ role }, hubId).populate('hubs_users');
+      const users = await this.userModel.find({ role }).populate('hub');
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',

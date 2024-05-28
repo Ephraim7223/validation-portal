@@ -9,7 +9,6 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -117,12 +116,10 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtGuard)
   @Get('role/:role')
-  async getUsersByRole(@Req() req, @Param('role') role: string) {
+  async getUsersByRole(@Param('role') role: string) {
     try {
-      const hubId = req.user._id;
-      const result = await this.userService.getUsersByRole(role, hubId);
+      const result = await this.userService.getUsersByRole(role);
       return result;
     } catch (error) {
       throw new BadRequestException(error.message);

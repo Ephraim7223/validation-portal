@@ -118,150 +118,165 @@ export class HubService {
   }
 
   async createUser(createUserDto: ApproveUserDto, hubId: string) {
-    let response: any;
-    const {
-      email,
-      NIN,
-      phoneNumber,
-      D_O_B,
-      start_date,
-      end_date,
-      role,
-      // Stack,
-    } = createUserDto;
+    const { email, NIN, phoneNumber, D_O_B, start_date, end_date, role } =
+      createUserDto;
 
-    const ninAsNumber = parseInt(NIN);
-    if (isNaN(ninAsNumber)) {
-      return { message: 'Invalid NIN format' };
-    }
-
-    const phoneNumberAsNumber = parseInt(phoneNumber);
-    if (isNaN(phoneNumberAsNumber)) {
-      return { message: 'Invalid phone number format' };
-    }
-
-    const parsedDOB = new Date(D_O_B);
-    if (isNaN(parsedDOB.getTime())) {
-      return { message: 'Invalid date of birth format' };
-    }
-
-    const today = new Date();
-    let age = today.getFullYear() - parsedDOB.getFullYear();
-    const m = today.getMonth() - parsedDOB.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
-      age--;
-    }
-
-    // Check if user with email already exists
-    const existingUser = await this.userModel.findOne({ email });
-    if (existingUser) {
-      response = {
-        statusCode: 409,
-        message: 'User with existing email already exists',
-        data: null,
-        error: {
-          code: 'USER_ALREADY_EXIST',
-          message: 'User with existing email already exists',
-        },
-      };
-    } else {
-      try {
-        this.logger.log(`Uploading profile picture to cloud...`);
-        const profilePic = await this.cloudinary.upload(
-          createUserDto.profilePic[0],
-        );
-        delete createUserDto.profilePic;
-
-        const newUser = await this.userModel.create({
-          ...createUserDto,
-          hub: hubId,
-          NIN: ninAsNumber,
-          phoneNumber: phoneNumberAsNumber,
-          profilePic: profilePic.secure_url,
-          age,
-          isPaid: true,
-          isActive: true,
-          isApproved: 'approved',
-          isCalledForInterview: 'done',
-        });
-
-        // Validate start_date and end_date
-        const startDate = new Date(start_date);
-        const endDate = new Date(end_date);
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          return {
-            statusCode: 400,
-            message: 'Invalid start date or end date',
-            data: null,
-            error: null,
-          };
-        }
-
-        // Calculate duration in days
-        const duration = this.calculateDurationInMonths(startDate, endDate);
-
-        // Generate userID
-        const userID = generateUserID(role);
-
-        // Update the document with the generated userID and duration
-        newUser.userID = userID;
-        newUser.duration = duration;
-
-        // Update hubs_users field in Hub model
-        const hub = await this.hubModel.findById(hubId);
-        if (!hub) {
-          throw new UnauthorizedException('Hub not found');
-        }
-        hub.hubs_users.push(newUser._id);
-        await hub.save();
-
-        const userDetails = {
-          email: newUser.email,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          phoneNumber: newUser.phoneNumber,
-          NIN: newUser.NIN,
-          age: newUser.age,
-          gender: newUser.gender,
-          Stack: newUser.Stack,
-          role: newUser.role,
-          hub: hubId,
-        };
-
-        const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
-        newUser.qrcode = qrCodeData;
-        await newUser.save();
-
-        this.logger.log(`Sending successful application email`);
-        await AcceptanceMail.mail(
-          newUser.firstName,
-          newUser.lastName,
-          hub.hubName,
-          newUser.userID,
-          newUser.Stack,
-          newUser.role,
-          newUser.duration,
-          newUser.email,
-        );
-
-        response = {
-          statusCode: 201,
-          message: 'User saved successfully',
-          data: newUser,
+    try {
+      // Validate NIN
+      const ninAsNumber = parseInt(NIN);
+      if (isNaN(ninAsNumber)) {
+        return {
+          statusCode: 400,
+          message: 'Invalid NIN format',
+          data: null,
           error: null,
         };
-      } catch (error) {
-        this.logger.error('Error creating user', error);
-        response = {
-          statusCode: 500,
-          message: 'Internal server error',
+      }
+
+      // Validate phone number
+      const phoneNumberAsNumber = parseInt(phoneNumber);
+      if (isNaN(phoneNumberAsNumber)) {
+        return {
+          statusCode: 400,
+          message: 'Invalid phone number format',
           data: null,
-          error,
+          error: null,
         };
       }
-    }
 
-    return response;
+      // Validate date of birth
+      const parsedDOB = new Date(D_O_B);
+      if (isNaN(parsedDOB.getTime())) {
+        return {
+          statusCode: 400,
+          message: 'Invalid date of birth format',
+          data: null,
+          error: null,
+        };
+      }
+
+      // Calculate age
+      const today = new Date();
+      let age = today.getFullYear() - parsedDOB.getFullYear();
+      const m = today.getMonth() - parsedDOB.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
+        age--;
+      }
+
+      // Check if user with email already exists
+      const existingUser = await this.userModel.findOne({ email });
+      if (existingUser) {
+        return {
+          statusCode: 409,
+          message: 'User with existing email already exists',
+          data: null,
+          error: {
+            code: 'USER_ALREADY_EXIST',
+            message: 'User with existing email already exists',
+          },
+        };
+      }
+
+      // Upload profile picture to cloud
+      this.logger.log(`Uploading profile picture to cloud...`);
+      const profilePic = await this.cloudinary.upload(
+        createUserDto.profilePic[0],
+      );
+      delete createUserDto.profilePic;
+
+      // Validate start_date and end_date
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return {
+          statusCode: 400,
+          message: 'Invalid start date or end date',
+          data: null,
+          error: null,
+        };
+      }
+
+      // Calculate duration in months
+      const duration = this.calculateDurationInMonths(startDate, endDate);
+
+      // Generate userID
+      const userID = this.generateUserID(role);
+
+      // Create new user
+      const newUser = await this.userModel.create({
+        ...createUserDto,
+        hub: hubId,
+        NIN: ninAsNumber,
+        phoneNumber: phoneNumberAsNumber,
+        profilePic: profilePic.secure_url,
+        age,
+        isPaid: true,
+        isActive: true,
+        isApproved: 'approved',
+        isCalledForInterview: 'done',
+        userID,
+        duration,
+      });
+
+      // Update hubs_users field in Hub model
+      const hub = await this.hubModel.findById(hubId);
+      if (!hub) {
+        throw new NotFoundException('Hub not found');
+      }
+      hub.hubs_users.push(newUser._id);
+      await hub.save();
+
+      // Generate QR code for user
+      const userDetails = {
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        phoneNumber: newUser.phoneNumber,
+        NIN: newUser.NIN,
+        age: newUser.age,
+        gender: newUser.gender,
+        Stack: newUser.Stack,
+        role: newUser.role,
+        hub: hubId,
+      };
+      const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
+      newUser.qrcode = qrCodeData;
+      await newUser.save();
+
+      // Send acceptance email
+      this.logger.log(`Sending successful application email`);
+      await AcceptanceMail.mail(
+        newUser.firstName,
+        newUser.lastName,
+        hub.hubName,
+        newUser.userID,
+        newUser.Stack,
+        newUser.role,
+        newUser.duration,
+        newUser.email,
+      );
+
+      return {
+        statusCode: 201,
+        message: 'User saved successfully',
+        data: newUser,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error('Error creating user', error);
+      return {
+        statusCode: 500,
+        message: 'Internal server error',
+        data: null,
+        error,
+      };
+    }
+  }
+
+  // Example method to generate a user ID based on the role
+  generateUserID(role: string): string {
+    // Example logic to generate user ID
+    return `${role}-${Date.now()}`;
   }
 
   async login(signInDto: SignInDto) {
