@@ -142,3 +142,9 @@ export class ScheduleInterviewDto {
   @IsOptional()
   isFinished: boolean;
 }
+
+export class SuspensionDto {
+  @IsString()
+  @IsNotEmpty()
+  suspensionReason: string;
+}

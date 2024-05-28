@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 
@@ -125,8 +125,17 @@ export class UserController {
   }
 
   @Patch('suspend/:id')
-  async suspendUser(@Param('id') id: string) {
-    return await this.userService.suspendUser(id);
+  async requestSuspension(
+    @Param('id') id: string,
+    @Body() suspensionDto: SuspensionDto,
+  ): Promise<any> {
+    try {
+      // Check user role (hub or admin) and call the appropriate method
+      const result = await this.userService.suspendUser(id, suspensionDto);
+      return result;
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Patch('unsuspend/:id')
@@ -162,4 +171,51 @@ export class UserController {
 
     return await this.userService.getUsersByOrganisation(organisation);
   }
+
+  // @Patch('suspend/:id')
+  // async requestSuspension(
+  //   @Param('id') id: string,
+  //   @Body() suspensionDto: SuspensionDto,
+  // ): Promise<any> {
+  //   try {
+  //     // Check user role (hub or admin) and call the appropriate method
+  //     const result = await this.userService.requestSuspension(
+  //       id,
+  //       suspensionDto,
+  //     );
+  //     return result;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
+  // @Get('suspension-requests')
+  // async getAllSuspensionRequests(): Promise<any> {
+  //   try {
+  //     const result = await this.userService.getAllSuspensionRequests();
+  //     return result;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
+  // @Get('suspension-requests/:id')
+  // async getSuspensionRequestById(@Param('id') id: string): Promise<any> {
+  //   try {
+  //     const result = await this.userService.getSuspensionRequestById(id);
+  //     return result;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
+  // @Patch('confirm-suspension/:id')
+  // async confirmSuspension(@Param('id') id: string): Promise<any> {
+  //   try {
+  //     const result = await this.userService.suspendUser(id);
+  //     return result;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
 }

@@ -10,7 +10,7 @@ import { User } from './schema';
 import { Model } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { Hub } from 'src/hubs/schema/hubs.schema';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
 import { UserSuspensionMail } from 'src/templates/suspendedUserMail';
 import { UserUnSuspensionMail } from 'src/templates/unsuspendedUserMail';
 import { ApplicationMail } from 'src/templates/successfulApplicationMail';
@@ -266,75 +266,40 @@ export class UserService {
     }
   }
 
-  async suspendUser(id: string) {
-    try {
-      const userToSuspend = await this.userModel.findById(id).populate('hub');
-      if (!userToSuspend) {
-        throw new NotFoundException('User not found');
-      }
+  // async suspendUser(id: string) {
+  //   try {
+  //     const userToSuspend = await this.userModel.findById(id).populate('hub');
+  //     if (!userToSuspend) {
+  //       throw new NotFoundException('User not found');
+  //     }
 
-      if (!userToSuspend.isActive) {
-        throw new BadRequestException('User is already suspended');
-      }
+  //     if (!userToSuspend.isActive) {
+  //       throw new BadRequestException('User is already suspended');
+  //     }
 
-      userToSuspend.isActive = false;
-      const updatedUser = await userToSuspend.save();
+  //     userToSuspend.isActive = false;
+  //     const updatedUser = await userToSuspend.save();
 
-      const hubName = (userToSuspend.hub as any).hubName;
+  //     const hubName = (userToSuspend.hub as any).hubName;
 
-      await UserSuspensionMail.mail(
-        updatedUser.firstName,
-        updatedUser.lastName,
-        updatedUser.email,
-        hubName, // Adjust this field based on your User schema
-      );
+  //     await UserSuspensionMail.mail(
+  //       updatedUser.firstName,
+  //       updatedUser.lastName,
+  //       updatedUser.email,
+  //       hubName, // Adjust this field based on your User schema
+  //     );
 
-      return {
-        statusCode: 200,
-        message: 'User suspended successfully',
-        data: updatedUser,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(`Error suspending user: ${error.message}`);
-      throw new BadRequestException('Internal Server Error');
-    }
-  }
-
-  async unSuspendUser(id: string) {
-    try {
-      const userToUnSuspend = await this.userModel.findById(id).populate('hub');
-      if (!userToUnSuspend) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (userToUnSuspend.isActive) {
-        throw new BadRequestException('User is not suspended');
-      }
-
-      userToUnSuspend.isActive = true;
-      const updatedUser = await userToUnSuspend.save();
-
-      const hubName = (userToUnSuspend.hub as any).hubName;
-
-      await UserUnSuspensionMail.mail(
-        updatedUser.firstName,
-        updatedUser.lastName,
-        hubName, // Adjust this field based on your User schema
-        updatedUser.email,
-      );
-
-      return {
-        statusCode: 200,
-        message: 'User unsuspended successfully',
-        data: updatedUser,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(`Error unsuspending user: ${error.message}`);
-      throw new BadRequestException('Internal Server Error');
-    }
-  }
+  //     return {
+  //       statusCode: 200,
+  //       message: 'User suspended successfully',
+  //       data: updatedUser,
+  //       error: null,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Error suspending user: ${error.message}`);
+  //     throw new BadRequestException('Internal Server Error');
+  //   }
+  // }
 
   async search(query: string) {
     try {
@@ -448,6 +413,195 @@ export class UserService {
 
       return users;
     } catch (error) {
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  //   async requestSuspension(id: string, suspensionDto: SuspensionDto) {
+  //     try {
+  //       const userToSuspend = await this.userModel.findById(id).populate('hub');
+  //       if (!userToSuspend) {
+  //         throw new NotFoundException('User not found');
+  //       }
+
+  //       const { suspensionReason } = suspensionDto;
+
+  //       if (!userToSuspend.isActive) {
+  //         throw new BadRequestException('User is already suspended');
+  //       }
+
+  //       userToSuspend.suspensionReason = suspensionReason;
+  //       userToSuspend.isPendingSuspension = true;
+  //       const updatedUser = await userToSuspend.save();
+
+  //       return {
+  //         statusCode: 200,
+  //         message: 'Suspension request sent for review',
+  //         data: updatedUser,
+  //         error: null,
+  //       };
+  //     } catch (error) {
+  //       this.logger.error(`Error requesting suspension: ${error.message}`);
+  //       throw new BadRequestException('Internal Server Error');
+  //     }
+  //   }
+
+  //   async suspendUser(id: string, uspensionDto: SuspensionDto) {
+  //     try {
+  //       const userToSuspend = await this.userModel.findById(id).populate('hub');
+  //       if (!userToSuspend) {
+  //         throw new NotFoundException('User not found');
+  //       }
+
+  //       if (!userToSuspend.isPendingSuspension) {
+  //         throw new BadRequestException('Suspension request not found');
+  //       }
+
+  //       // Perform suspension
+  //       userToSuspend.isActive = false;
+  //       userToSuspend.isPendingSuspension = false;
+  //       const updatedUser = await userToSuspend.save();
+
+  //       // Notify user about suspension
+  //       await UserSuspensionMail.mail(
+  //         updatedUser.firstName,
+  //         updatedUser.lastName,
+  //         updatedUser.email,
+  //         updatedUser.suspensionReason,
+  //       );
+
+  //       return {
+  //         statusCode: 200,
+  //         message: 'User suspended successfully',
+  //         data: updatedUser,
+  //         error: null,
+  //       };
+  //     } catch (error) {
+  //       this.logger.error(`Error suspending user: ${error.message}`);
+  //       throw new BadRequestException('Internal Server Error');
+  //     }
+  //   }
+
+  //   async getAllSuspensionRequests() {
+  //     try {
+  //       const suspensionRequests = await this.userModel.find({
+  //         isPendingSuspension: true,
+  //       });
+  //       return {
+  //         statusCode: 200,
+  //         message: 'All suspension requests retrieved successfully',
+  //         data: suspensionRequests,
+  //         error: null,
+  //       };
+  //     } catch (error) {
+  //       this.logger.error(`Error fetching suspension requests: ${error.message}`);
+  //       throw new BadRequestException('Internal Server Error');
+  //     }
+  //   }
+
+  //   async getSuspensionRequestById(id: string) {
+  //     try {
+  //       const suspensionRequest = await this.userModel.findOne({
+  //         _id: id,
+  //         isPendingSuspension: true,
+  //       });
+  //       if (!suspensionRequest) {
+  //         throw new NotFoundException('Suspension request not found');
+  //       }
+
+  //       return {
+  //         statusCode: 200,
+  //         message: 'Suspension request retrieved successfully',
+  //         data: suspensionRequest,
+  //         error: null,
+  //       };
+  //     } catch (error) {
+  //       this.logger.error(`Error fetching suspension request: ${error.message}`);
+  //       throw new BadRequestException('Internal Server Error');
+  //     }
+  //   }
+  //
+
+  async suspendUser(id: string, suspensionDto: SuspensionDto) {
+    try {
+      const userToSuspend = await this.userModel.findById(id).populate('hub');
+      if (!userToSuspend) {
+        throw new NotFoundException('User not found');
+      }
+
+      const { suspensionReason } = suspensionDto;
+
+      if (!userToSuspend.isActive) {
+        throw new BadRequestException('User is already suspended');
+      }
+
+      // Perform suspension
+      userToSuspend.isActive = false;
+      userToSuspend.isPendingSuspension = false;
+      userToSuspend.suspensionReason = suspensionReason;
+      const updatedUser = await userToSuspend.save();
+
+      // Notify user about suspension
+      await UserSuspensionMail.mail(
+        updatedUser.firstName,
+        updatedUser.lastName,
+        updatedUser.hub.hubName,
+        updatedUser.email,
+        // suspensionReason,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'User suspended successfully',
+        data: updatedUser,
+        error: null,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error; // Re-throw BadRequestException to propagate the error message
+      }
+      this.logger.error(`Error suspending user: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async unSuspendUser(id: string) {
+    try {
+      const userToUnsuspend = await this.userModel.findById(id).populate('hub');
+      if (!userToUnsuspend) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (userToUnsuspend.isActive) {
+        throw new BadRequestException('User is not suspended');
+      }
+
+      // Perform unsuspension
+      userToUnsuspend.isActive = true;
+      const updatedUser = await userToUnsuspend.save();
+
+      // Notify user about unsuspension
+      await UserUnSuspensionMail.mail(
+        updatedUser.firstName,
+        updatedUser.lastName,
+        updatedUser.hub.hubName,
+        updatedUser.email,
+      );
+
+      return {
+        statusCode: 200,
+        message: 'User unsuspended successfully',
+        data: updatedUser,
+        error: null,
+      };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error; // Re-throw BadRequestException or NotFoundException to propagate the error message
+      }
+      this.logger.error(`Error unsuspending user: ${error.message}`);
       throw new BadRequestException('Internal Server Error');
     }
   }

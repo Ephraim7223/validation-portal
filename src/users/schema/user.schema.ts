@@ -89,6 +89,12 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isTerminated: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  isPendingSuspension: boolean;
+
+  @Prop({})
+  suspensionReason: string;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' })
   hub: Hub;
 

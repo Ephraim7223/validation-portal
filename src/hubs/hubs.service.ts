@@ -447,7 +447,7 @@ export class HubService {
   }
 
   async approveUser(userId: string, hubId: string) {
-    let response: any;
+    // let response: any;
 
     const user = await this.userModel.findOne({
       _id: userId,
