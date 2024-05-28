@@ -151,7 +151,7 @@ export class UserController {
     return await this.userService.getStacksCount();
   }
 
-  @Get('count-by-role-and-month')
+  @Get('users/count-by-role-and-month')
   async getUsersCountByRoleAndMonth() {
     return await this.userService.getUsersCountByRoleAndMonth();
   }
@@ -174,51 +174,4 @@ export class UserController {
 
     return await this.userService.getUsersByOrganisation(organisation);
   }
-
-  // @Patch('suspend/:id')
-  // async requestSuspension(
-  //   @Param('id') id: string,
-  //   @Body() suspensionDto: SuspensionDto,
-  // ): Promise<any> {
-  //   try {
-  //     // Check user role (hub or admin) and call the appropriate method
-  //     const result = await this.userService.requestSuspension(
-  //       id,
-  //       suspensionDto,
-  //     );
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
-  // @Get('suspension-requests')
-  // async getAllSuspensionRequests(): Promise<any> {
-  //   try {
-  //     const result = await this.userService.getAllSuspensionRequests();
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
-  // @Get('suspension-requests/:id')
-  // async getSuspensionRequestById(@Param('id') id: string): Promise<any> {
-  //   try {
-  //     const result = await this.userService.getSuspensionRequestById(id);
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
-  // @Patch('confirm-suspension/:id')
-  // async confirmSuspension(@Param('id') id: string): Promise<any> {
-  //   try {
-  //     const result = await this.userService.suspendUser(id);
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
 }

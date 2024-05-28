@@ -14,6 +14,7 @@ import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
 import { UserSuspensionMail } from 'src/templates/suspendedUserMail';
 import { UserUnSuspensionMail } from 'src/templates/unsuspendedUserMail';
 import { ApplicationMail } from 'src/templates/successfulApplicationMail';
+import { generateUserID } from 'src/functions/genrating-random-number';
 
 @Injectable()
 export class UserService {
@@ -99,6 +100,7 @@ export class UserService {
         phoneNumber: phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
         age,
+        userID: generateUserID(createUserDto.role),
       });
 
       // Generate QR code with user details
@@ -265,41 +267,47 @@ export class UserService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+  async getUsersCountByRoleAndMonth() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const roles = ['Intern', 'Private', 'Freelancer'];
+      const userCountsByRoleAndMonth = [];
 
-  // async suspendUser(id: string) {
-  //   try {
-  //     const userToSuspend = await this.userModel.findById(id).populate('hub');
-  //     if (!userToSuspend) {
-  //       throw new NotFoundException('User not found');
-  //     }
+      for (const role of roles) {
+        const roleUsers = await this.userModel
+          .find({
+            role,
+            createdAt: {
+              $gte: new Date(`${currentYear}-01-01`),
+              $lt: new Date(`${currentYear + 1}-01-01`),
+            },
+          })
+          .exec();
 
-  //     if (!userToSuspend.isActive) {
-  //       throw new BadRequestException('User is already suspended');
-  //     }
+        const countsByMonth = Array.from({ length: 12 }, () => 0);
 
-  //     userToSuspend.isActive = false;
-  //     const updatedUser = await userToSuspend.save();
+        for (const user of roleUsers) {
+          const month = new Date(user.createdAt).getMonth();
+          countsByMonth[month]++;
+        }
 
-  //     const hubName = (userToSuspend.hub as any).hubName;
+        userCountsByRoleAndMonth.push({
+          role,
+          countsByMonth,
+        });
+      }
 
-  //     await UserSuspensionMail.mail(
-  //       updatedUser.firstName,
-  //       updatedUser.lastName,
-  //       updatedUser.email,
-  //       hubName, // Adjust this field based on your User schema
-  //     );
-
-  //     return {
-  //       statusCode: 200,
-  //       message: 'User suspended successfully',
-  //       data: updatedUser,
-  //       error: null,
-  //     };
-  //   } catch (error) {
-  //     this.logger.error(`Error suspending user: ${error.message}`);
-  //     throw new BadRequestException('Internal Server Error');
-  //   }
-  // }
+      return {
+        statusCode: 200,
+        message: 'User counts by role and month retrieved successfully',
+        data: userCountsByRoleAndMonth,
+        error: null,
+      };
+    } catch (error) {
+      console.error('Error fetching user counts by role and month:', error);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 
   async search(query: string) {
     try {
@@ -357,50 +365,6 @@ export class UserService {
     }
   }
 
-  async getUsersCountByRoleAndMonth() {
-    try {
-      const currentYear = new Date().getFullYear();
-      const roles = ['Intern', 'Private', 'Freelancer'];
-      const userCountsByRoleAndMonth = [];
-
-      for (const role of roles) {
-        const roleUsers = await this.userModel
-          .find({
-            role,
-            createdAt: {
-              $gte: new Date(`${currentYear}-01-01`),
-              $lt: new Date(`${currentYear + 1}-01-01`),
-            },
-          })
-          .exec();
-
-        const countsByMonth = Array.from({ length: 12 }, () => 0);
-
-        for (const user of roleUsers) {
-          const month = new Date(user.createdAt).getMonth();
-          countsByMonth[month]++;
-        }
-
-        userCountsByRoleAndMonth.push({
-          role,
-          countsByMonth,
-        });
-      }
-
-      return {
-        statusCode: 200,
-        message: 'User counts by role and month retrieved successfully',
-        data: userCountsByRoleAndMonth,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error fetching user counts by role and month: ${error.message}`,
-      );
-      throw new BadRequestException('Internal Server Error');
-    }
-  }
-
   async getUsersByOrganisation(organisation: string) {
     try {
       const users = await this.userModel.find({ organisation });
@@ -416,111 +380,6 @@ export class UserService {
       throw new BadRequestException('Internal Server Error');
     }
   }
-
-  //   async requestSuspension(id: string, suspensionDto: SuspensionDto) {
-  //     try {
-  //       const userToSuspend = await this.userModel.findById(id).populate('hub');
-  //       if (!userToSuspend) {
-  //         throw new NotFoundException('User not found');
-  //       }
-
-  //       const { suspensionReason } = suspensionDto;
-
-  //       if (!userToSuspend.isActive) {
-  //         throw new BadRequestException('User is already suspended');
-  //       }
-
-  //       userToSuspend.suspensionReason = suspensionReason;
-  //       userToSuspend.isPendingSuspension = true;
-  //       const updatedUser = await userToSuspend.save();
-
-  //       return {
-  //         statusCode: 200,
-  //         message: 'Suspension request sent for review',
-  //         data: updatedUser,
-  //         error: null,
-  //       };
-  //     } catch (error) {
-  //       this.logger.error(`Error requesting suspension: ${error.message}`);
-  //       throw new BadRequestException('Internal Server Error');
-  //     }
-  //   }
-
-  //   async suspendUser(id: string, uspensionDto: SuspensionDto) {
-  //     try {
-  //       const userToSuspend = await this.userModel.findById(id).populate('hub');
-  //       if (!userToSuspend) {
-  //         throw new NotFoundException('User not found');
-  //       }
-
-  //       if (!userToSuspend.isPendingSuspension) {
-  //         throw new BadRequestException('Suspension request not found');
-  //       }
-
-  //       // Perform suspension
-  //       userToSuspend.isActive = false;
-  //       userToSuspend.isPendingSuspension = false;
-  //       const updatedUser = await userToSuspend.save();
-
-  //       // Notify user about suspension
-  //       await UserSuspensionMail.mail(
-  //         updatedUser.firstName,
-  //         updatedUser.lastName,
-  //         updatedUser.email,
-  //         updatedUser.suspensionReason,
-  //       );
-
-  //       return {
-  //         statusCode: 200,
-  //         message: 'User suspended successfully',
-  //         data: updatedUser,
-  //         error: null,
-  //       };
-  //     } catch (error) {
-  //       this.logger.error(`Error suspending user: ${error.message}`);
-  //       throw new BadRequestException('Internal Server Error');
-  //     }
-  //   }
-
-  //   async getAllSuspensionRequests() {
-  //     try {
-  //       const suspensionRequests = await this.userModel.find({
-  //         isPendingSuspension: true,
-  //       });
-  //       return {
-  //         statusCode: 200,
-  //         message: 'All suspension requests retrieved successfully',
-  //         data: suspensionRequests,
-  //         error: null,
-  //       };
-  //     } catch (error) {
-  //       this.logger.error(`Error fetching suspension requests: ${error.message}`);
-  //       throw new BadRequestException('Internal Server Error');
-  //     }
-  //   }
-
-  //   async getSuspensionRequestById(id: string) {
-  //     try {
-  //       const suspensionRequest = await this.userModel.findOne({
-  //         _id: id,
-  //         isPendingSuspension: true,
-  //       });
-  //       if (!suspensionRequest) {
-  //         throw new NotFoundException('Suspension request not found');
-  //       }
-
-  //       return {
-  //         statusCode: 200,
-  //         message: 'Suspension request retrieved successfully',
-  //         data: suspensionRequest,
-  //         error: null,
-  //       };
-  //     } catch (error) {
-  //       this.logger.error(`Error fetching suspension request: ${error.message}`);
-  //       throw new BadRequestException('Internal Server Error');
-  //     }
-  //   }
-  //
 
   async suspendUser(id: string, suspensionDto: SuspensionDto) {
     try {

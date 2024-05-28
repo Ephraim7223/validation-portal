@@ -199,8 +199,8 @@ export class HubService {
       // Calculate duration in months
       const duration = this.calculateDurationInMonths(startDate, endDate);
 
-      // Generate userID
-      const userID = this.generateUserID(role);
+      // // Generate userID
+      // generateUserID(role);
 
       // Create new user
       const newUser = await this.userModel.create({
@@ -214,7 +214,7 @@ export class HubService {
         isActive: true,
         isApproved: 'approved',
         isCalledForInterview: 'done',
-        userID,
+        userID: generateUserID(role),
         duration,
       });
 
@@ -273,11 +273,11 @@ export class HubService {
     }
   }
 
-  // Example method to generate a user ID based on the role
-  generateUserID(role: string): string {
-    // Example logic to generate user ID
-    return `${role}-${Date.now()}`;
-  }
+  // // Example method to generate a user ID based on the role
+  // generateUserID(role: string): string {
+  //   // Example logic to generate user ID
+  //   return `${role}-${Date.now()}`;
+  // }
 
   async login(signInDto: SignInDto) {
     try {
@@ -515,7 +515,7 @@ export class HubService {
       const userID = generateUserID(role);
 
       // Update the document with the generated userID and duration
-      user.userID = userID;
+      // user.userID = userID;
       user.duration = duration;
 
       // Retrieve the hub to get the hubName
