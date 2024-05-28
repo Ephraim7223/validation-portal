@@ -9,7 +9,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -145,8 +144,9 @@ export class UserController {
     return await this.userService.getUsersCountByRoleAndMonth();
   }
 
-  @Get('search')
-  async search(@Query('query') query: string) {
+  @Post('search')
+  async search(@Body() body: { query: string }) {
+    const { query } = body;
     if (!query || query.trim() === '') {
       throw new BadRequestException('Search query is required');
     }

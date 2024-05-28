@@ -336,48 +336,6 @@ export class UserService {
     }
   }
 
-  async getUsersCountByRoleAndMonth() {
-    try {
-      const currentYear = new Date().getFullYear();
-      const roles = ['Intern', 'Private', 'Freelancer'];
-      const userCountsByRoleAndMonth = [];
-
-      for (const role of roles) {
-        const roleUsers = await this.userModel.find({
-          role,
-          createdAt: {
-            $gte: new Date(`${currentYear}-01-01`),
-            $lt: new Date(`${currentYear + 1}-01-01`),
-          },
-        });
-
-        const countsByMonth = Array.from({ length: 12 }, () => 0);
-
-        for (const user of roleUsers) {
-          const month = new Date(user.createdAt).getMonth();
-          countsByMonth[month]++;
-        }
-
-        userCountsByRoleAndMonth.push({
-          role,
-          countsByMonth,
-        });
-      }
-
-      return {
-        statusCode: 200,
-        message: 'User counts by role and month retrieved successfully',
-        data: userCountsByRoleAndMonth,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error fetching user counts by role and month: ${error.message}`,
-      );
-      throw new BadRequestException('Internal Server Error');
-    }
-  }
-
   async search(query: string) {
     try {
       if (!query || query.trim() === '') {
@@ -387,8 +345,8 @@ export class UserService {
       const searchResults = await this.userModel.find({
         $or: [
           { email: { $regex: query, $options: 'i' } },
-          { phoneNumber: { $regex: query, $options: 'i' } },
-          { NIN: { $regex: query, $options: 'i' } },
+          // { phoneNumber: { $regex: query, $options: '' } },
+          // { NIN: { $regex: query, $options: '' } },
           { role: { $regex: query, $options: 'i' } },
           { Stack: { $regex: query, $options: 'i' } },
           { userID: { $regex: query, $options: 'i' } },
@@ -430,6 +388,50 @@ export class UserService {
       };
     } catch (error) {
       this.logger.error(`Error fetching stacks count: ${error.message}`);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
+
+  async getUsersCountByRoleAndMonth() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const roles = ['Intern', 'Private', 'Freelancer'];
+      const userCountsByRoleAndMonth = [];
+
+      for (const role of roles) {
+        const roleUsers = await this.userModel
+          .find({
+            role,
+            createdAt: {
+              $gte: new Date(`${currentYear}-01-01`),
+              $lt: new Date(`${currentYear + 1}-01-01`),
+            },
+          })
+          .exec();
+
+        const countsByMonth = Array.from({ length: 12 }, () => 0);
+
+        for (const user of roleUsers) {
+          const month = new Date(user.createdAt).getMonth();
+          countsByMonth[month]++;
+        }
+
+        userCountsByRoleAndMonth.push({
+          role,
+          countsByMonth,
+        });
+      }
+
+      return {
+        statusCode: 200,
+        message: 'User counts by role and month retrieved successfully',
+        data: userCountsByRoleAndMonth,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error fetching user counts by role and month: ${error.message}`,
+      );
       throw new BadRequestException('Internal Server Error');
     }
   }
