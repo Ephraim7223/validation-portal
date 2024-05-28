@@ -152,4 +152,14 @@ export class UserController {
     }
     return await this.userService.search(query);
   }
+
+  @Post('getUsersByOrganisation')
+  async getUsersByOrganisation(@Body() body: { organisation: string }) {
+    const { organisation } = body;
+    if (!organisation || organisation.trim() === '') {
+      throw new BadRequestException('Organisation field is required');
+    }
+
+    return await this.userService.getUsersByOrganisation(organisation);
+  }
 }

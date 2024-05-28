@@ -28,7 +28,6 @@ import { SuspensionMail } from 'src/templates/suspensionMail';
 import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
-import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 
 @Injectable()
 export class HubService {
@@ -48,6 +47,15 @@ export class HubService {
     const fileName = parts[parts.length - 1];
     const publicId = fileName.split('.')[0];
     return publicId;
+  }
+
+  calculateDurationInMonths(startDate: Date, endDate: Date): number {
+    const startYear = startDate.getFullYear();
+    const startMonth = startDate.getMonth();
+    const endYear = endDate.getFullYear();
+    const endMonth = endDate.getMonth();
+
+    return (endYear - startYear) * 12 + (endMonth - startMonth);
   }
 
   async register(createHubDto: CreateHubDto) {
@@ -106,7 +114,16 @@ export class HubService {
 
   async createUser(createUserDto: ApproveUserDto, hubId: string) {
     let response: any;
-    const { email, NIN, phoneNumber, D_O_B } = createUserDto;
+    const {
+      email,
+      NIN,
+      phoneNumber,
+      D_O_B,
+      start_date,
+      end_date,
+      role,
+      // Stack,
+    } = createUserDto;
 
     const ninAsNumber = parseInt(NIN);
     if (isNaN(ninAsNumber)) {
@@ -150,7 +167,6 @@ export class HubService {
         );
         delete createUserDto.profilePic;
 
-        // Create new user with Hub ID from JWT token
         const newUser = await this.userModel.create({
           ...createUserDto,
           hub: hubId,
@@ -158,9 +174,42 @@ export class HubService {
           phoneNumber: phoneNumberAsNumber,
           profilePic: profilePic.secure_url,
           age,
+          isPaid: true,
+          isActive: true,
+          isApproved: 'approved',
+          isCalledForInterview: 'done',
         });
 
-        // Update user details
+        // Validate start_date and end_date
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date);
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          return {
+            statusCode: 400,
+            message: 'Invalid start date or end date',
+            data: null,
+            error: null,
+          };
+        }
+
+        // Calculate duration in days
+        const duration = this.calculateDurationInMonths(startDate, endDate);
+
+        // Generate userID
+        const userID = generateUserID(role);
+
+        // Update the document with the generated userID and duration
+        newUser.userID = userID;
+        newUser.duration = duration;
+
+        // Update hubs_users field in Hub model
+        const hub = await this.hubModel.findById(hubId);
+        if (!hub) {
+          throw new UnauthorizedException('Hub not found');
+        }
+        hub.hubs_users.push(newUser._id);
+        await hub.save();
+
         const userDetails = {
           email: newUser.email,
           firstName: newUser.firstName,
@@ -178,18 +227,15 @@ export class HubService {
         newUser.qrcode = qrCodeData;
         await newUser.save();
 
-        // Update hubs_users field in Hub model
-        const hub = await this.hubModel.findById(hubId);
-        if (!hub) {
-          throw new UnauthorizedException('Hub not found');
-        }
-        hub.hubs_users.push(newUser._id);
-        await hub.save();
-
         this.logger.log(`Sending successful application email`);
-        await ApplicationMail.mail(
+        await AcceptanceMail.mail(
           newUser.firstName,
           newUser.lastName,
+          hub.hubName,
+          newUser.userID,
+          newUser.Stack,
+          newUser.role,
+          newUser.duration,
           newUser.email,
         );
 
@@ -438,91 +484,97 @@ export class HubService {
     }
   }
 
-  async approveUser(userId: string, hub: string) {
+  async approveUser(userId: string, hubId: string) {
     let response: any;
 
     const user = await this.userModel.findOne({
       _id: userId,
-      hubId: hub,
+      hubId: hubId,
     });
 
     if (!user) {
-      return (response = {
+      return {
         statusCode: 404,
         message:
           'No user found with this id or the user does not belong to this hub',
         data: null,
         error: null,
-      });
+      };
     }
 
     if (user.isDeleted) {
-      return (response = {
+      return {
         statusCode: 400,
         message: 'Cannot approve a deleted user',
         data: null,
         error: null,
-      });
+      };
     }
 
     try {
-      const {
-        email,
-        firstName,
-        lastName,
-        start_date,
-        end_date,
-        Stack,
-        hub,
-        role,
-      } = user;
+      const { email, firstName, lastName, start_date, end_date, Stack, role } =
+        user;
 
       // Validate start_date and end_date
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return (response = {
+        return {
           statusCode: 400,
           message: 'Invalid start date or end date',
           data: null,
           error: null,
-        });
+        };
       }
 
       // Calculate duration in days
-      const duration = Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      // const duration = Math.ceil(
+      //   (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      // );
+
+      const duration = this.calculateDurationInMonths(startDate, endDate);
 
       // Generate userID
-      const userID = generateUserID(role); // Assuming there's a function to generate a userID
+      const userID = generateUserID(role);
 
       // Update the document with the generated userID and duration
       user.userID = userID;
       user.duration = duration;
 
+      // Retrieve the hub to get the hubName
+      const hub = await this.hubModel.findById(hubId);
+      if (!hub) {
+        return {
+          statusCode: 404,
+          message: 'Hub not found',
+          data: null,
+          error: null,
+        };
+      }
+
       // Send acceptance email
       await AcceptanceMail.mail(
         firstName,
         lastName,
-        role,
+        hub.hubName,
         userID,
-        email,
-        hub,
         Stack,
+        role,
         duration,
+        email,
       );
 
       user.isApproved = 'approved';
       user.isCalledForInterview = 'done';
+      user.isPaid = true;
       await user.save();
 
-      return (response = {
+      return {
         statusCode: 200,
-        message: `User approved successfully`,
+        message: 'User approved successfully',
         data: null,
         error: null,
-      });
+      };
     } catch (err) {
       console.log(err);
 
@@ -531,14 +583,13 @@ export class HubService {
           JSON.stringify(err, null, 2),
       );
 
-      response = {
+      return {
         statusCode: 400,
         message: 'An error occurred updating user',
         data: null,
         error: err,
       };
     }
-    return response;
   }
 
   async scheduleInterview(

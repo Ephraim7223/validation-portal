@@ -5,12 +5,12 @@ export class AcceptanceMail {
   static async mail(
     firstName: string,
     lastName: string,
-    role: string,
-    userID: string,
-    email: string,
     hub: any,
+    userID: string,
     Stack: string,
+    role: string,
     duration: any,
+    email: string,
   ) {
     const html = {
       body: {
@@ -22,7 +22,7 @@ export class AcceptanceMail {
           `<h2>Application Details</h2>`,
           `Chosen Stack: ${Stack}`,
           `Registered Role: ${role}`,
-          `For a duration of ${duration}`,
+          `For a duration of ${duration} months`,
         ],
         outro: [
           'For further assistance and enquiries about your organisation`s activities, please do not hesitate to contact us.',

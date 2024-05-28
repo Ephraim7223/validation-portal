@@ -435,4 +435,20 @@ export class UserService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+
+  async getUsersByOrganisation(organisation: string) {
+    try {
+      const users = await this.userModel.find({ organisation });
+
+      if (!users || users.length === 0) {
+        throw new BadRequestException(
+          'No users found for the specified organisation',
+        );
+      }
+
+      return users;
+    } catch (error) {
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 }
