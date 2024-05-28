@@ -12,7 +12,7 @@ export class Hub {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   phone: string;
 
   @Prop({ required: true })

@@ -18,13 +18,13 @@ export class User {
   @Prop({ required: true })
   lastName: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   phoneNumber: number;
 
   @Prop({ required: true })
   profilePic: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   NIN: number;
 
   @Prop({})

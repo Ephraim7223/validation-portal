@@ -65,19 +65,26 @@ export class HubService {
 
   async register(createHubDto: CreateHubDto) {
     let response: any;
-    const { email, hubName } = createHubDto;
+    const { email, hubName, phone } = createHubDto;
+
+    const phoneNumberAsNumber = parseInt(phone);
+    if (isNaN(phoneNumberAsNumber)) {
+      return { message: 'Invalid phone number format' };
+    }
 
     this.logger.log('Looking for a hub with an existing email');
-    const existingHub = await this.hubModel.findOne({ email });
+    const existingHub = await this.hubModel.findOne({
+      $or: [{ email }, { phone }],
+    });
 
     if (existingHub) {
       response = {
         statusCode: 409,
-        message: 'Hub with existing email already exists',
+        message: 'Hub with existing email or phonealready exists',
         data: null,
         error: {
           code: 'HUB_ALREADY_EXIST',
-          message: 'Hub with existing email already exists',
+          message: 'Hub with existing email or phone already exists',
         },
       };
     } else {
@@ -97,6 +104,7 @@ export class HubService {
       const newHub = await this.hubModel.create({
         ...createHubDto,
         hubId,
+        phone: phoneNumberAsNumber,
         password: hashedPassword,
         CAC: CAC.secure_url,
         logo: logo.secure_url,
@@ -164,15 +172,23 @@ export class HubService {
       }
 
       // Check if user with email already exists
-      const existingUser = await this.userModel.findOne({ email });
+      const existingUser = await this.userModel.findOne({
+        $or: [
+          { email },
+          { phoneNumber: phoneNumberAsNumber },
+          { NIN: ninAsNumber },
+        ],
+      });
       if (existingUser) {
         return {
           statusCode: 409,
-          message: 'User with existing email already exists',
+          message:
+            'User with existing email, phone number, or NIN already exists',
           data: null,
           error: {
             code: 'USER_ALREADY_EXIST',
-            message: 'User with existing email already exists',
+            message:
+              'User with existing email, phone number, or NIN already exists',
           },
         };
       }
@@ -622,7 +638,7 @@ export class HubService {
       const interviewLocation = hub.address;
 
       // Update user with interview details
-      user.isCalledForInterview = 'done';
+      user.isCalledForInterview = 'called';
       user.interviewDate = interviewDto.interviewDate;
       user.interviewTime = interviewDto.interviewTime;
       user.interview_location = interviewLocation;

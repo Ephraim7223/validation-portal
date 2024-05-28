@@ -62,16 +62,23 @@ export class UserService {
     }
 
     this.logger.log('Looking for a user with an existing email');
-    const existingUser = await this.userModel.findOne({ email });
-
+    const existingUser = await this.userModel.findOne({
+      $or: [
+        { email },
+        { phoneNumber: phoneNumberAsNumber },
+        { NIN: ninAsNumber },
+      ],
+    });
     if (existingUser) {
-      response = {
+      return {
         statusCode: 409,
-        message: 'User with existing email already exists',
+        message:
+          'User with existing email, phone number, or NIN already exists',
         data: null,
         error: {
           code: 'USER_ALREADY_EXIST',
-          message: 'User with existing email already exists',
+          message:
+            'User with existing email, phone number, or NIN already exists',
         },
       };
     } else {
