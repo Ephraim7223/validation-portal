@@ -254,4 +254,11 @@ export class HubsController {
     const hubId = req.user._id;
     return this.hubsService.getStacksCount(hubId);
   }
+
+  @UseGuards(new JwtGuard(['hub']))
+  @Get('users/pending-users')
+  async getPendingUsers(@Req() req) {
+    const hubId = req.user._id;
+    return await this.hubsService.getPendingUsers(hubId);
+  }
 }

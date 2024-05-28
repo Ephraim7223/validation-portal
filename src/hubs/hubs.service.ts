@@ -764,4 +764,21 @@ export class HubService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+
+  async getPendingUsers(hubId: string) {
+    try {
+      const pendingUsers = await this.userModel
+        .find({ hub: hubId, isApproved: 'pending' })
+        .exec();
+
+      return {
+        statusCode: 200,
+        message: 'Pending users retrieved successfully',
+        data: pendingUsers,
+        error: null,
+      };
+    } catch (error) {
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 }
