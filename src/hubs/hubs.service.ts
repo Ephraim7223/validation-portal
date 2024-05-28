@@ -118,12 +118,12 @@ export class HubService {
   }
 
   async createUser(createUserDto: ApproveUserDto, hubId: string) {
-    const { email, NIN, phoneNumber, D_O_B, start_date, end_date, role } =
+    const { email, NIN, phoneNumber, D_O_B, start_date, end_date } =
       createUserDto;
 
     try {
       // Validate NIN
-      const ninAsNumber = parseInt(NIN);
+      const ninAsNumber = parseInt(NIN, 10);
       if (isNaN(ninAsNumber)) {
         return {
           statusCode: 400,
@@ -134,7 +134,7 @@ export class HubService {
       }
 
       // Validate phone number
-      const phoneNumberAsNumber = parseInt(phoneNumber);
+      const phoneNumberAsNumber = parseInt(phoneNumber, 10);
       if (isNaN(phoneNumberAsNumber)) {
         return {
           statusCode: 400,
@@ -199,11 +199,8 @@ export class HubService {
       // Calculate duration in months
       const duration = this.calculateDurationInMonths(startDate, endDate);
 
-      // // Generate userID
-      // generateUserID(role);
-
       // Create new user
-      const newUser = await this.userModel.create({
+      const newUser = new this.userModel({
         ...createUserDto,
         hub: hubId,
         NIN: ninAsNumber,
@@ -214,9 +211,11 @@ export class HubService {
         isActive: true,
         isApproved: 'approved',
         isCalledForInterview: 'done',
-        userID: generateUserID(role),
+        userID: generateUserID(createUserDto.role),
         duration,
       });
+
+      await newUser.save();
 
       // Update hubs_users field in Hub model
       const hub = await this.hubModel.findById(hubId);
@@ -272,12 +271,6 @@ export class HubService {
       };
     }
   }
-
-  // // Example method to generate a user ID based on the role
-  // generateUserID(role: string): string {
-  //   // Example logic to generate user ID
-  //   return `${role}-${Date.now()}`;
-  // }
 
   async login(signInDto: SignInDto) {
     try {
