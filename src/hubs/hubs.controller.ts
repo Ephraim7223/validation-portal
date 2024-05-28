@@ -207,8 +207,8 @@ export class HubsController {
     return response;
   }
 
-  @UseGuards(JwtGuard)
-  @Post('schedule/:id')
+  @UseGuards(new JwtGuard(['hub']))
+  @Post('users/schedule/:id')
   async scheduleInterview(
     @Req() req,
     @Param('id') id: string,

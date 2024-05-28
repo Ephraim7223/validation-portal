@@ -563,26 +563,35 @@ export class HubService {
   }
 
   async scheduleInterview(
-    id: string,
+    userId: string,
     hubId: string,
     interviewDto: ScheduleInterviewDto,
   ) {
-    const user = await this.userModel.findById(id).populate('hub');
+    // Find the user by ID and hub ID
+    const user = await this.userModel.findOne({
+      _id: userId,
+      hub: hubId,
+    });
+
+    // Check if the user exists and belongs to the specified hub
     if (!user) {
-      throw new BadRequestException('User not found');
+      return {
+        statusCode: 404,
+        message:
+          'No user found with this ID or the user does not belong to this hub',
+        data: null,
+        error: null,
+      };
     }
 
-    if (user.hub && user.hub._id.toString() !== hubId) {
-      throw new BadRequestException('User does not belong to your hub');
-    }
-
-    this.logger.log(
-      `Checking if the user is already scheduled for an interview...`,
-    );
+    // Check if the user is already scheduled for an interview
     if (user.isCalledForInterview === 'done') {
-      throw new BadRequestException(
-        'User is already scheduled for an interview',
-      );
+      return {
+        statusCode: 400,
+        message: 'User is already scheduled for an interview',
+        data: null,
+        error: null,
+      };
     }
 
     if (
@@ -598,44 +607,55 @@ export class HubService {
       };
     }
 
-    // Fetch hub details based on the user's chosen hub
-    const hub = await this.hubModel.findById(user.hub);
-    if (!hub) {
-      throw new BadRequestException('Hub not found');
+    try {
+      // Fetch hub details based on the user's chosen hub
+      const hub = await this.hubModel.findById(hubId);
+      if (!hub) {
+        return {
+          statusCode: 404,
+          message: 'Hub not found',
+          data: null,
+          error: null,
+        };
+      }
+
+      const interviewLocation = hub.address;
+
+      // Update user with interview details
+      user.isCalledForInterview = 'done';
+      user.interviewDate = interviewDto.interviewDate;
+      user.interviewTime = interviewDto.interviewTime;
+      user.interview_location = interviewLocation;
+      await user.save();
+
+      // Send interview email to user
+      await InterviewMail.mail(
+        user.email,
+        user.firstName,
+        user.lastName,
+        user.interviewDate,
+        user.interviewTime,
+        interviewLocation,
+      );
+
+      // Return success response
+      return {
+        statusCode: 200,
+        message: 'Interview scheduled successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error scheduling interview for user ${userId}: ${error.message}`,
+      );
+      return {
+        statusCode: 400,
+        message: 'An error occurred scheduling the interview',
+        data: null,
+        error: error,
+      };
     }
-
-    const interviewLocation = hub.address;
-
-    this.logger.log(`Updating user data with interview details...`);
-    user.isCalledForInterview = 'done';
-    user.interviewDate = interviewDto.interviewDate;
-    user.interviewTime = interviewDto.interviewTime;
-    user.interview_location = interviewLocation;
-
-    await user.save();
-
-    this.logger.log(`Sending interview email to user...`);
-    await InterviewMail.mail(
-      user.email,
-      user.firstName,
-      user.lastName,
-      user.interviewDate,
-      user.interviewTime,
-      interviewLocation,
-    );
-
-    return {
-      statusCode: 200,
-      message: 'Interview scheduled successfully',
-      data: user,
-      error: null,
-    };
-  }
-  catch(error) {
-    this.logger.error(
-      `Error scheduling interview for user ${User}: ${error.message}`,
-    );
-    throw new BadRequestException('Could not schedule interview');
   }
 
   async getUsersPendingInterview(hubId: string) {
