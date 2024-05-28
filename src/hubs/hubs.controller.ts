@@ -181,18 +181,19 @@ export class HubsController {
     }
   }
 
-  @UseGuards(JwtGuard)
-  @Get('users')
+  @UseGuards(new JwtGuard(['hub']))
+  @Get('users/users')
   async getUsersUnderHub(@Req() req) {
-    const hubId = req.hub; // Extract hub ID from authenticated user
+    const hubId = req.user._id; // Extract hub ID from authenticated user
     return this.hubsService.getUsersUnderHub(hubId);
   }
 
-  // @Get('users/:userId')
-  // async getSingleUser(@Req() req, @Param('userId') userId: string) {
-  //   const hubId = req.user._id; // Extract hub ID from authenticated user
-  //   return this.hubsService.getSingleUser(hubId, userId);
-  // }
+  @UseGuards(new JwtGuard(['hub']))
+  @Get('users/users/:userId')
+  async getSingleUser(@Req() req, @Param('userId') userId: string) {
+    const hubId = req.user._id; // Extract hub ID from authenticated user
+    return this.hubsService.getSingleUser(hubId, userId);
+  }
 
   @UseGuards(JwtGuard)
   @Put('approve/:userId')
@@ -201,7 +202,7 @@ export class HubsController {
     @Req() req,
     // @Res() res: Response,
   ) {
-    const hubId = req.hub;
+    const hubId = req.user._id;
     const response = await this.hubsService.approveUser(userId, hubId);
     return response;
   }
@@ -213,7 +214,7 @@ export class HubsController {
     @Param('id') id: string,
     @Body() interviewDto: ScheduleInterviewDto,
   ) {
-    const hubId = req.user.hubId; // assuming the JWT contains the hub ID
+    const hubId = req.user._id; // assuming the JWT contains the hub ID
     try {
       const result = await this.hubsService.scheduleInterview(
         id,

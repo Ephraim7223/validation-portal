@@ -58,6 +58,11 @@ export class HubService {
     return (endYear - startYear) * 12 + (endMonth - startMonth);
   }
 
+  isValidObjectId(id: string): boolean {
+    // Add validation logic for ObjectId if needed
+    return id.match(/^[0-9a-fA-F]{24}$/) != null;
+  }
+
   async register(createHubDto: CreateHubDto) {
     let response: any;
     const { email, hubName } = createHubDto;
@@ -441,49 +446,6 @@ export class HubService {
     }
   }
 
-  async getUsersUnderHub(hubId: string) {
-    try {
-      const hub = await this.hubModel.findById(hubId).populate('hubs_users');
-      if (!hub) {
-        throw new NotFoundException('Hub not found');
-      }
-      return {
-        statusCode: 200,
-        message: 'Users retrieved successfully',
-        data: hub.hubs_users,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error retrieving users for hub ${hubId}: ${error.message}`,
-      );
-      throw new BadRequestException('Could not retrieve users');
-    }
-  }
-
-  async getSingleUser(hubId: string, userId: string) {
-    try {
-      // Find the user by ID and ensure it belongs to the requesting hub
-      const user = await this.userModel.findOne({ _id: userId, hub: hubId });
-      if (!user) {
-        throw new NotFoundException(
-          'User not found or does not belong to this hub',
-        );
-      }
-      return {
-        statusCode: 200,
-        message: 'User retrieved successfully',
-        data: user,
-        error: null,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error retrieving user ${userId} for hub ${hubId}: ${error.message}`,
-      );
-      throw new BadRequestException('Could not retrieve user');
-    }
-  }
-
   async approveUser(userId: string, hubId: string) {
     let response: any;
 
@@ -695,6 +657,51 @@ export class HubService {
       throw new BadRequestException(
         'Could not retrieve users pending interview',
       );
+    }
+  }
+
+  async getUsersUnderHub(hubId: any) {
+    try {
+      const hub = await this.hubModel.findById(hubId).populate('hubs_users');
+      if (!hub) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      const usersUnderHub = hub.hubs_users;
+
+      return {
+        statusCode: 200,
+        message: 'Users retrieved successfully',
+        data: usersUnderHub,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving users for hub ${hubId}: ${error.message}`,
+      );
+      throw new BadRequestException('Could not retrieve users');
+    }
+  }
+
+  async getSingleUser(hubId: string, userId: string) {
+    try {
+      const user = await this.userModel.findOne({ _id: userId, hub: hubId });
+      if (!user) {
+        throw new NotFoundException(
+          'User not found or does not belong to this hub',
+        );
+      }
+      return {
+        statusCode: 200,
+        message: 'User retrieved successfully',
+        data: user,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving user ${userId} for hub ${hubId}: ${error.message}`,
+      );
+      throw new BadRequestException('Could not retrieve user');
     }
   }
 }
