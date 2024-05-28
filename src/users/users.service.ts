@@ -333,9 +333,12 @@ export class UserService {
     }
   }
 
-  async getStacksCount() {
+  async getStacksCount(hubId) {
     try {
-      const userStacks = await this.userModel.find().select('Stack').exec();
+      const userStacks = await this.userModel
+        .find(hubId)
+        .select('Stack')
+        .exec();
       const stackCounts = userStacks.reduce((counts, user) => {
         const stack = user.Stack;
         if (!counts[stack]) {
