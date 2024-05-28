@@ -781,4 +781,47 @@ export class HubService {
       throw new BadRequestException('Internal Server Error');
     }
   }
+
+  async getUsersCountByRoleAndMonth(hubId: string) {
+    try {
+      const currentYear = new Date().getFullYear();
+      const roles = ['Intern', 'Private', 'Freelancer'];
+      const userCountsByRoleAndMonth = [];
+
+      for (const role of roles) {
+        const roleUsers = await this.userModel
+          .find({
+            hub: hubId,
+            role,
+            createdAt: {
+              $gte: new Date(`${currentYear}-01-01`),
+              $lt: new Date(`${currentYear + 1}-01-01`),
+            },
+          })
+          .exec();
+
+        const countsByMonth = Array.from({ length: 12 }, () => 0);
+
+        for (const user of roleUsers) {
+          const month = new Date(user.createdAt).getMonth();
+          countsByMonth[month]++;
+        }
+
+        userCountsByRoleAndMonth.push({
+          role,
+          countsByMonth,
+        });
+      }
+
+      return {
+        statusCode: 200,
+        message: 'User counts by role and month retrieved successfully',
+        data: userCountsByRoleAndMonth,
+        error: null,
+      };
+    } catch (error) {
+      console.error('Error fetching user counts by role and month:', error);
+      throw new BadRequestException('Internal Server Error');
+    }
+  }
 }

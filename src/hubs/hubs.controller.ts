@@ -261,4 +261,11 @@ export class HubsController {
     const hubId = req.user._id;
     return await this.hubsService.getPendingUsers(hubId);
   }
+
+  @UseGuards(new JwtGuard(['hub']))
+  @Get('users/users-count-by-role-and-month')
+  async getUsersCountByRoleAndMonth(@Req() req) {
+    const hubId = req.user._id;
+    return await this.hubsService.getUsersCountByRoleAndMonth(hubId);
+  }
 }
