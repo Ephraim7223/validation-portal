@@ -188,11 +188,11 @@ export class HubsController {
     return this.hubsService.getUsersUnderHub(hubId);
   }
 
-  @Get('users/:userId')
-  async getSingleUser(@Req() req, @Param('userId') userId: string) {
-    const hubId = req.user._id; // Extract hub ID from authenticated user
-    return this.hubsService.getSingleUser(hubId, userId);
-  }
+  // @Get('users/:userId')
+  // async getSingleUser(@Req() req, @Param('userId') userId: string) {
+  //   const hubId = req.user._id; // Extract hub ID from authenticated user
+  //   return this.hubsService.getSingleUser(hubId, userId);
+  // }
 
   @UseGuards(JwtGuard)
   @Put('approve/:userId')
@@ -230,5 +230,13 @@ export class HubsController {
       this.logger.error(`Error scheduling interview: ${error.message}`);
       throw new BadRequestException('Could not schedule interview');
     }
+  }
+
+  @UseGuards(JwtGuard)
+  // @Get('users/pending-interview')
+  @Get('users/pending-interview')
+  async getUsersPendingInterview(@Req() req) {
+    const hubId = req.user._id; // Assuming hubId is stored in the user property of the request object
+    return this.hubsService.getUsersPendingInterview(hubId);
   }
 }

@@ -667,4 +667,34 @@ export class HubService {
     );
     throw new BadRequestException('Could not schedule interview');
   }
+
+  async getUsersPendingInterview(hubId: string) {
+    try {
+      // Find the hub and populate its users
+      const hub = await this.hubModel.findById(hubId).populate('hubs_users');
+      // .exec();
+      if (!hub) {
+        throw new NotFoundException('Hub not found');
+      }
+
+      // Filter users pending interview
+      const usersPendingInterview = hub.hubs_users.filter((user: any) => {
+        return user.isCalledForInterview !== 'done';
+      });
+
+      return {
+        statusCode: 200,
+        message: 'Users pending interview retrieved successfully',
+        data: usersPendingInterview,
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving users pending interview for hub ${hubId}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        'Could not retrieve users pending interview',
+      );
+    }
+  }
 }
