@@ -117,10 +117,12 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtGuard)
   @Get('role/:role')
-  async getUsersByRole(@Param('role') role: string) {
+  async getUsersByRole(@Req() req, @Param('role') role: string) {
     try {
-      const result = await this.userService.getUsersByRole(role);
+      const hubId = req.user._id;
+      const result = await this.userService.getUsersByRole(role, hubId);
       return result;
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -146,11 +148,10 @@ export class UserController {
     return await this.userService.unSuspendUser(id);
   }
 
-  @UseGuards(new JwtGuard(['hub']))
+  @UseGuards(JwtGuard)
   @Get('stacks/count')
-  async getStacksCount(@Req() req) {
-    const hubId = req.user._id;
-    return await this.userService.getStacksCount(hubId);
+  async getStacksCount() {
+    return await this.userService.getStacksCount();
   }
 
   @Get('count-by-role-and-month')

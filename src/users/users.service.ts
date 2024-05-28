@@ -251,9 +251,9 @@ export class UserService {
     }
   }
 
-  async getUsersByRole(role: string) {
+  async getUsersByRole(role: string, hubId) {
     try {
-      const users = await this.userModel.find({ role }).populate('hub');
+      const users = await this.userModel.find({ role }, hubId).populate('hub');
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
@@ -333,12 +333,9 @@ export class UserService {
     }
   }
 
-  async getStacksCount(hubId) {
+  async getStacksCount() {
     try {
-      const userStacks = await this.userModel
-        .find(hubId)
-        .select('Stack')
-        .exec();
+      const userStacks = await this.userModel.find().select('Stack').exec();
       const stackCounts = userStacks.reduce((counts, user) => {
         const stack = user.Stack;
         if (!counts[stack]) {
