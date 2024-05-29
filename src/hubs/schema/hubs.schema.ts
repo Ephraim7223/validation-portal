@@ -51,6 +51,9 @@ export class Hub {
   @Prop({ default: false })
   isPaid: boolean;
 
+  @Prop()
+  paidAt: Date;
+
   _id: any;
 }
 

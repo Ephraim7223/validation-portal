@@ -9,6 +9,7 @@ export class VerifiedMail {
         greeting: `Dear ${hubName}`,
         intro: [
           `Congratulations! Your hub has been successfully verified.`,
+          `Please note that you will be redirected to a payment page during your first login to complete your subscription.`,
           `Your Hub ID: ${hubId}`,
           'You can now login to your dashboard.',
         ],

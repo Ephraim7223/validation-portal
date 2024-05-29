@@ -6,7 +6,7 @@ export class SubscriptionStatusMail {
     const html = {
       body: {
         signature: false,
-        greeting: `Dear ${hubName},`,
+        greeting: `Dear ${hubName}`,
         intro: [
           `We are writing to inform you that your subscription status has been updated.`,
           `Your current subscription status is: ${isPaid ? 'Active' : 'Inactive'}.`,

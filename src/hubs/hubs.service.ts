@@ -1,4 +1,5 @@
 import * as QRCode from 'qrcode';
+import * as cron from 'node-cron';
 import {
   BadRequestException,
   Injectable,
@@ -34,6 +35,7 @@ import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
 import { SubscriptionStatusMail } from 'src/templates/suscriptionMail';
+import { SubscriptionExpiryMail } from 'src/templates/expiredSuscriptionMail';
 
 @Injectable()
 export class HubService {
@@ -869,9 +871,13 @@ export class HubService {
     }
 
     hub.isPaid = isPaid;
+    hub.paidAt = new Date(); // Track when the hub was paid
     await hub.save();
 
     await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid);
+
+    // Schedule a task to turn isPaid to false after 5 minutes (for testing)
+    this.scheduleExpiryTask(hubId, hub.paidAt);
 
     return {
       statusCode: 200,
@@ -879,5 +885,46 @@ export class HubService {
       data: hub,
       error: null,
     };
+  }
+
+  private scheduleExpiryTask(hubId: string, paidAt: Date) {
+    this.logger.log(`Scheduling expiry task for hub ${hubId}`);
+
+    // This runs every minute
+    const job = cron.schedule(
+      `*/1 * * * *`,
+      async () => {
+        try {
+          const hub = await this.hubModel.findById(hubId);
+          if (!hub) {
+            this.logger.warn(`Hub ${hubId} not found during expiry task`);
+            job.stop();
+            return;
+          }
+
+          const now = new Date();
+          const fiveMinutesLater = new Date(paidAt.getTime() + 5 * 60000); // 5 minutes later
+
+          if (now >= fiveMinutesLater) {
+            hub.isPaid = false;
+            await hub.save();
+            this.logger.log(
+              `Updated hub ${hubId} isPaid to false after 5 minutes.`,
+            );
+            await SubscriptionExpiryMail.mail(hub.hubName, hub.email);
+            job.stop(); // Stop the cron job after execution
+          } else {
+            this.logger.log(
+              `Hub ${hubId} is still active. Next check in 1 minute.`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error in expiry task for hub ${hubId}: ${error.message}`,
+          );
+        }
+      },
+      { scheduled: true },
+    );
   }
 }
