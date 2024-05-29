@@ -10,7 +10,6 @@ import {
   Patch,
   Post,
   UploadedFiles,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './users.service';
@@ -18,7 +17,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
-import { JwtGuard } from 'src/guards';
+// import { JwtGuard } from 'src/guards';
 
 @Controller('users')
 export class UserController {
@@ -145,7 +144,6 @@ export class UserController {
     return await this.userService.unSuspendUser(id);
   }
 
-  @UseGuards(JwtGuard)
   @Get('stacks/count')
   async getStacksCount() {
     return await this.userService.getStacksCount();
