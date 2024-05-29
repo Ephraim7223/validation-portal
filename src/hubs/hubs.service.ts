@@ -138,7 +138,6 @@ export class HubService {
       createUserDto;
 
     try {
-      // Validate NIN
       const ninAsNumber = parseInt(NIN, 10);
       if (isNaN(ninAsNumber)) {
         return {
@@ -149,7 +148,6 @@ export class HubService {
         };
       }
 
-      // Validate phone number
       const phoneNumberAsNumber = parseInt(phoneNumber, 10);
       if (isNaN(phoneNumberAsNumber)) {
         return {
@@ -160,7 +158,6 @@ export class HubService {
         };
       }
 
-      // Validate date of birth
       const parsedDOB = new Date(D_O_B);
       if (isNaN(parsedDOB.getTime())) {
         return {
@@ -171,7 +168,6 @@ export class HubService {
         };
       }
 
-      // Calculate age
       const today = new Date();
       let age = today.getFullYear() - parsedDOB.getFullYear();
       const m = today.getMonth() - parsedDOB.getMonth();
@@ -179,7 +175,6 @@ export class HubService {
         age--;
       }
 
-      // Check if user with email already exists
       const existingUser = await this.userModel.findOne({
         $or: [
           { email },
@@ -201,14 +196,12 @@ export class HubService {
         };
       }
 
-      // Upload profile picture to cloud
       this.logger.log(`Uploading profile picture to cloud...`);
       const profilePic = await this.cloudinary.upload(
         createUserDto.profilePic[0],
       );
       delete createUserDto.profilePic;
 
-      // Validate start_date and end_date
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -220,10 +213,8 @@ export class HubService {
         };
       }
 
-      // Calculate duration in months
       const duration = this.calculateDurationInMonths(startDate, endDate);
 
-      // Create new user
       const newUser = new this.userModel({
         ...createUserDto,
         hub: hubId,
@@ -241,7 +232,6 @@ export class HubService {
 
       await newUser.save();
 
-      // Update hubs_users field in Hub model
       const hub = await this.hubModel.findById(hubId);
       if (!hub) {
         throw new NotFoundException('Hub not found');
@@ -249,7 +239,6 @@ export class HubService {
       hub.hubs_users.push(newUser._id);
       await hub.save();
 
-      // Generate QR code for user
       const userDetails = {
         email: newUser.email,
         firstName: newUser.firstName,
@@ -266,7 +255,6 @@ export class HubService {
       newUser.qrcode = qrCodeData;
       await newUser.save();
 
-      // Send acceptance email
       this.logger.log(`Sending successful application email`);
       await AcceptanceMail.mail(
         newUser.firstName,
@@ -310,10 +298,6 @@ export class HubService {
       if (hub.isSuspended === true) {
         throw new UnauthorizedException('Account is suspended');
       }
-
-      // if (hub.isPaid === false) {
-      //   throw new UnauthorizedException('You have not subscribed yet');
-      // }
 
       const passMatches = await argon.verify(hub.password, signInDto.password);
       if (!passMatches) {
@@ -410,7 +394,6 @@ export class HubService {
         throw new NotFoundException('Hub not found');
       }
 
-      // Delete hub
       await hubToDelete.deleteOne();
 
       return {
@@ -509,14 +492,6 @@ export class HubService {
         error: null,
       };
     }
-    // if ((user.isApproved = 'approved')) {
-    //   return {
-    //     statusCode: 400,
-    //     message: 'Cannot approve an approved user',
-    //     data: null,
-    //     error: null,
-    //   };
-    // }
 
     try {
       const { email, firstName, lastName, Stack, role } = user;
@@ -629,7 +604,6 @@ export class HubService {
     }
 
     try {
-      // Fetch hub details based on the user's chosen hub
       const hub = await this.hubModel.findById(hubId);
       if (!hub) {
         return {
@@ -642,24 +616,21 @@ export class HubService {
 
       const interviewLocation = hub.address;
 
-      // Update user with interview details
       user.isCalledForInterview = 'called';
       user.interviewDate = interviewDto.interviewDate;
       user.interviewTime = interviewDto.interviewTime;
       user.interview_location = interviewLocation;
       await user.save();
 
-      // Send interview email to user
       await InterviewMail.mail(
         user.email,
         user.firstName,
         user.lastName,
-        user.interviewDate,
-        user.interviewTime,
+        interviewDto.interviewDate,
+        interviewDto.interviewTime,
         interviewLocation,
       );
 
-      // Return success response
       return {
         statusCode: 200,
         message: 'Interview scheduled successfully',
@@ -681,14 +652,12 @@ export class HubService {
 
   async getUsersPendingInterview(hubId: string) {
     try {
-      // Find the hub and populate its users
       const hub = await this.hubModel.findById(hubId).populate('hubs_users');
       // .exec();
       if (!hub) {
         throw new NotFoundException('Hub not found');
       }
 
-      // Filter users pending interview
       const usersPendingInterview = hub.hubs_users.filter((user: any) => {
         return user.isCalledForInterview !== 'done';
       });
@@ -771,7 +740,6 @@ export class HubService {
     }
   }
 
-  // Get the count of stacks within a specific hub
   async getStacksCount(hubId: string) {
     try {
       const userStacks = await this.userModel
@@ -871,12 +839,11 @@ export class HubService {
     }
 
     hub.isPaid = isPaid;
-    hub.paidAt = new Date(); // Track when the hub was paid
+    hub.paidAt = new Date();
     await hub.save();
 
     await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid);
 
-    // Schedule a task to turn isPaid to false after 5 minutes (for testing)
     this.scheduleExpiryTask(hubId, hub.paidAt);
 
     return {
@@ -890,7 +857,6 @@ export class HubService {
   private scheduleExpiryTask(hubId: string, paidAt: Date) {
     this.logger.log(`Scheduling expiry task for hub ${hubId}`);
 
-    // This runs every minute
     const job = cron.schedule(
       `*/1 * * * *`,
       async () => {
@@ -912,7 +878,7 @@ export class HubService {
               `Updated hub ${hubId} isPaid to false after 5 minutes.`,
             );
             await SubscriptionExpiryMail.mail(hub.hubName, hub.email);
-            job.stop(); // Stop the cron job after execution
+            job.stop();
           } else {
             this.logger.log(
               `Hub ${hubId} is still active. Next check in 1 minute.`,
