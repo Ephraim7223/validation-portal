@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Logger } from '@nestjs/common';
-import pdfKit from 'pdfkit';
+import PDFDocument from 'pdfkit'; // Correct import for pdfkit
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
@@ -17,7 +17,7 @@ export const generateAcceptanceLetter = async (
 ) => {
   logger.log(`initializing acceptance letter pdf generation...`);
 
-  const doc = new pdfKit({
+  const doc = PDFDocument({
     size: 'A4',
     margins: {
       top: 50,
@@ -26,11 +26,12 @@ export const generateAcceptanceLetter = async (
       right: 50,
     },
   });
+
   const stream = doc.pipe(fs.createWriteStream('acceptance.pdf'));
   const fontBold = 'Helvetica-Bold';
   const fontNormal = 'Helvetica';
 
-  const logoPath = path.join('src/services', 'logo.png');
+  const logoPath = path.join(__dirname, 'logo.png'); // Adjust the path if necessary
   // const signatureImage = path.join('src/utils', 'signature.jpeg');
   // const sendingTime = new Date().toLocaleString().split(',')[0];
 
@@ -42,7 +43,9 @@ export const generateAcceptanceLetter = async (
 
     // Adding profile picture placeholder
     doc.circle(300, 100, 50).stroke();
-    doc.fontSize(12).text(firstName + lastName, 250, 170, { align: 'center' });
+    doc
+      .fontSize(12)
+      .text(firstName + ' ' + lastName, 250, 170, { align: 'center' });
     doc.fontSize(10).text(hub, 250, 190, { align: 'center' });
     doc.fontSize(10).text(role, 250, 210, { align: 'center' });
     doc.fontSize(10).text(userID, 250, 230, { align: 'center' });
@@ -50,7 +53,8 @@ export const generateAcceptanceLetter = async (
     // QR Code
     const qrCodeData = await QRCode.toDataURL(
       JSON.stringify({
-        name,
+        firstName,
+        lastName,
         userID,
         Stack,
         hub,
@@ -77,8 +81,7 @@ export const generateAcceptanceLetter = async (
     doc.image(logoPath, 250, 520, { width: 50 });
 
     doc.end();
-    const data = await doc.read();
-
+    const data = await stream;
     logger.log(`pdf generation completed, returning file as base64`);
     return data.toString('base64');
   } catch (err) {

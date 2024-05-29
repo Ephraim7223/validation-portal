@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import { mailTransport } from 'src/common/config';
 import { mailGenerator } from '../common/config/mailgen';
-import { addImageWatermarkToPDF } from 'src/services';
-import { generateAcceptanceLetter } from 'src/services/acceptance-letter-generator';
-const fs = require('fs');
+// import { addImageWatermarkToPDF } from 'src/services';
+// import { generateAcceptanceLetter } from 'src/services/acceptance-letter-generator';
+// const fs = require('fs');
 
 export class AcceptanceMail {
   static async mail(
@@ -34,31 +34,31 @@ export class AcceptanceMail {
       },
     };
     const template = mailGenerator.generate(html);
-    const acceptanceBase64 = await generateAcceptanceLetter(
-      firstName,
-      lastName,
-      hub,
-      userID,
-      Stack,
-      role,
-    );
+    // const acceptanceBase64 = await generateAcceptanceLetter(
+    //   firstName,
+    //   lastName,
+    //   hub,
+    //   userID,
+    //   Stack,
+    //   role,
+    // );
 
-    await fs.writeFileSync(
-      'acceptance.pdf',
-      Buffer.from(acceptanceBase64, 'base64'),
-    );
-    addImageWatermarkToPDF(
-      'acceptance.pdf',
-      'acceptance-water.pdf',
-      'src/utils/foundation.png',
-    );
+    // await fs.writeFileSync(
+    //   'acceptance.pdf',
+    //   Buffer.from(acceptanceBase64, 'base64'),
+    // );
+    // addImageWatermarkToPDF(
+    //   'acceptance.pdf',
+    //   'acceptance-water.pdf',
+    //   'src/utils/foundation.png',
+    // );
 
-    const attachments = [
-      {
-        filename: `${firstName} + ${lastName}-acceptance.pdf`,
-        path: 'acceptance-water.pdf',
-      },
-    ];
+    // const attachments = [
+    //   {
+    //     filename: `${firstName} + ${lastName}-acceptance.pdf`,
+    //     path: 'acceptance-water.pdf',
+    //   },
+    // ];
     const mail = {
       to: email,
       subject: 'Congratulations on Your Acceptance!',
@@ -70,7 +70,7 @@ export class AcceptanceMail {
       mail.to,
       mail.subject,
       mail.html,
-      attachments,
+      // attachments,
     );
   }
 }

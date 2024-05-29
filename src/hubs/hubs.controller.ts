@@ -16,6 +16,8 @@ import {
   NotFoundException,
   UnauthorizedException,
   Put,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
@@ -23,6 +25,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import {
+  ApproveApplicationDto,
   ApproveUserDto,
   ScheduleInterviewDto,
   // ApproveUserDto,
@@ -195,15 +198,20 @@ export class HubsController {
     return this.hubsService.getSingleUser(hubId, userId);
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @Put('approve/:userId')
+  @UsePipes(new ValidationPipe({ transform: true }))
   async approveUser(
     @Param('userId') userId: string,
     @Req() req,
-    // @Res() res: Response,
+    @Body() approveApplicationDto: ApproveApplicationDto,
   ) {
     const hubId = req.user._id;
-    const response = await this.hubsService.approveUser(userId, hubId);
+    const response = await this.hubsService.approveUser(
+      approveApplicationDto,
+      userId,
+      hubId,
+    );
     return response;
   }
 

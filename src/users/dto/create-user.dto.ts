@@ -148,3 +148,13 @@ export class SuspensionDto {
   @IsNotEmpty()
   suspensionReason: string;
 }
+
+export class ApproveApplicationDto {
+  @IsDateString()
+  @IsNotEmpty()
+  start_date: Date;
+
+  @IsDateString()
+  @IsNotEmpty()
+  end_date: Date;
+}

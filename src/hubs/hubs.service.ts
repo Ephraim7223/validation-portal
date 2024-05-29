@@ -15,6 +15,7 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { User } from 'src/users/schema';
 import { SuccessMail } from 'src/templates/success';
 import {
+  ApproveApplicationDto,
   ApproveUserDto,
   ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
@@ -470,13 +471,14 @@ export class HubService {
     }
   }
 
-  async approveUser(userId: string, hubId: string) {
-    // let response: any;
+  async approveUser(
+    approveApplicationDto: ApproveApplicationDto,
+    userId: string,
+    hubId: string,
+  ) {
+    const { start_date, end_date } = approveApplicationDto;
 
-    const user = await this.userModel.findOne({
-      _id: userId,
-      hubId: hubId,
-    });
+    const user = await this.userModel.findOne({ _id: userId, hub: hubId });
 
     if (!user) {
       return {
@@ -496,14 +498,21 @@ export class HubService {
         error: null,
       };
     }
+    if ((user.isApproved = 'approved')) {
+      return {
+        statusCode: 400,
+        message: 'Cannot approve an approved user',
+        data: null,
+        error: null,
+      };
+    }
 
     try {
-      const { email, firstName, lastName, start_date, end_date, Stack, role } =
-        user;
+      const { email, firstName, lastName, Stack, role } = user;
 
-      // Validate start_date and end_date
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
+
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         return {
           statusCode: 400,
@@ -513,21 +522,12 @@ export class HubService {
         };
       }
 
-      // Calculate duration in days
-      // const duration = Math.ceil(
-      //   (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      // );
-
       const duration = this.calculateDurationInMonths(startDate, endDate);
 
-      // Generate userID
       const userID = generateUserID(role);
 
-      // Update the document with the generated userID and duration
-      // user.userID = userID;
       user.duration = duration;
 
-      // Retrieve the hub to get the hubName
       const hub = await this.hubModel.findById(hubId);
       if (!hub) {
         return {
@@ -538,7 +538,6 @@ export class HubService {
         };
       }
 
-      // Send acceptance email
       await AcceptanceMail.mail(
         firstName,
         lastName,
@@ -562,13 +561,10 @@ export class HubService {
         error: null,
       };
     } catch (err) {
-      console.log(err);
-
       this.logger.log(
         `Error updating user with id: [${userId}]: ` +
           JSON.stringify(err, null, 2),
       );
-
       return {
         statusCode: 400,
         message: 'An error occurred updating user',
@@ -583,13 +579,11 @@ export class HubService {
     hubId: string,
     interviewDto: ScheduleInterviewDto,
   ) {
-    // Find the user by ID and hub ID
     const user = await this.userModel.findOne({
       _id: userId,
       hub: hubId,
     });
 
-    // Check if the user exists and belongs to the specified hub
     if (!user) {
       return {
         statusCode: 404,
@@ -600,7 +594,6 @@ export class HubService {
       };
     }
 
-    // Check if the user is already scheduled for an interview
     if (user.isCalledForInterview === 'done') {
       return {
         statusCode: 400,
