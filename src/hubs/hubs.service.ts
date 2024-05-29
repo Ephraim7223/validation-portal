@@ -33,6 +33,7 @@ import { SuspensionMail } from 'src/templates/suspensionMail';
 import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
+import { SubscriptionStatusMail } from 'src/templates/suscriptionMail';
 
 @Injectable()
 export class HubService {
@@ -869,6 +870,8 @@ export class HubService {
 
     hub.isPaid = isPaid;
     await hub.save();
+
+    await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid);
 
     return {
       statusCode: 200,
