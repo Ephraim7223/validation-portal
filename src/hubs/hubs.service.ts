@@ -498,14 +498,14 @@ export class HubService {
         error: null,
       };
     }
-    if ((user.isApproved = 'approved')) {
-      return {
-        statusCode: 400,
-        message: 'Cannot approve an approved user',
-        data: null,
-        error: null,
-      };
-    }
+    // if ((user.isApproved = 'approved')) {
+    //   return {
+    //     statusCode: 400,
+    //     message: 'Cannot approve an approved user',
+    //     data: null,
+    //     error: null,
+    //   };
+    // }
 
     try {
       const { email, firstName, lastName, Stack, role } = user;
