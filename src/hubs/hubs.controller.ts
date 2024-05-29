@@ -20,7 +20,11 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
-import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
+import {
+  CreateHubDto,
+  SignInDto,
+  UpdatePaidStatusDto,
+} from './dto/create-hub.dto';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
@@ -275,5 +279,13 @@ export class HubsController {
   async getUsersCountByRoleAndMonth(@Req() req) {
     const hubId = req.user._id;
     return await this.hubsService.getUsersCountByRoleAndMonth(hubId);
+  }
+
+  @Patch('payment/:id')
+  async updatePaidStatus(
+    @Param('id') id: string,
+    @Body() updatePaidStatusDto: UpdatePaidStatusDto,
+  ) {
+    return this.hubsService.updatePaidStatus(id, updatePaidStatusDto);
   }
 }

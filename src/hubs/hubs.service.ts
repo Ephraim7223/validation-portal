@@ -6,7 +6,11 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateHubDto, SignInDto } from './dto/create-hub.dto';
+import {
+  CreateHubDto,
+  SignInDto,
+  UpdatePaidStatusDto,
+} from './dto/create-hub.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as argon from 'argon2';
@@ -302,6 +306,10 @@ export class HubService {
 
       if (hub.isSuspended === true) {
         throw new UnauthorizedException('Account is suspended');
+      }
+
+      if (hub.isPaid === false) {
+        throw new UnauthorizedException('You have not subscribed yet');
       }
 
       const passMatches = await argon.verify(hub.password, signInDto.password);
@@ -846,5 +854,27 @@ export class HubService {
       console.error('Error fetching user counts by role and month:', error);
       throw new BadRequestException('Internal Server Error');
     }
+  }
+
+  async updatePaidStatus(
+    hubId: string,
+    updatePaidStatusDto: UpdatePaidStatusDto,
+  ) {
+    const { isPaid } = updatePaidStatusDto;
+    const hub = await this.hubModel.findById(hubId);
+
+    if (!hub) {
+      throw new NotFoundException('Hub not found');
+    }
+
+    hub.isPaid = isPaid;
+    await hub.save();
+
+    return {
+      statusCode: 200,
+      message: 'Hub payment status updated successfully',
+      data: hub,
+      error: null,
+    };
   }
 }

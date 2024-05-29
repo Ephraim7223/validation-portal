@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateHubDto {
   @IsString()
@@ -38,4 +38,10 @@ export class SignInDto {
   @IsNotEmpty()
   @IsString()
   password: string;
+}
+
+export class UpdatePaidStatusDto {
+  @IsBoolean()
+  @IsNotEmpty()
+  isPaid: boolean;
 }
