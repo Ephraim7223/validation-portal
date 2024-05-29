@@ -552,6 +552,7 @@ export class HubService {
       user.isApproved = 'approved';
       user.isCalledForInterview = 'done';
       user.isPaid = true;
+      user.isActive = true;
       await user.save();
 
       return {
