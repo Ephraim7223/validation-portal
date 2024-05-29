@@ -308,9 +308,9 @@ export class HubService {
         throw new UnauthorizedException('Account is suspended');
       }
 
-      if (hub.isPaid === false) {
-        throw new UnauthorizedException('You have not subscribed yet');
-      }
+      // if (hub.isPaid === false) {
+      //   throw new UnauthorizedException('You have not subscribed yet');
+      // }
 
       const passMatches = await argon.verify(hub.password, signInDto.password);
       if (!passMatches) {
