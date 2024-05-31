@@ -239,19 +239,24 @@ export class HubService {
       hub.hubs_users.push(newUser._id);
       await hub.save();
 
-      const userDetails = {
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        phoneNumber: newUser.phoneNumber,
-        NIN: newUser.NIN,
-        age: newUser.age,
-        gender: newUser.gender,
-        Stack: newUser.Stack,
-        role: newUser.role,
-        hub: hubId,
-      };
-      const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
+      // const userDetails = {
+      //   email: newUser.email,
+      //   firstName: newUser.firstName,
+      //   lastName: newUser.lastName,
+      //   phoneNumber: newUser.phoneNumber,
+      //   NIN: newUser.NIN,
+      //   age: newUser.age,
+      //   gender: newUser.gender,
+      //   Stack: newUser.Stack,
+      //   role: newUser.role,
+      //   hub: hubId,
+      // };
+      // const websiteUrl = `https://www.example.com?email=${encodeURIComponent(newUser.email)}&firstName=${encodeURIComponent(newUser.firstName)}&lastName=${encodeURIComponent(newUser.lastName)}&phoneNumber=${encodeURIComponent(newUser.phoneNumber)}&NIN=${encodeURIComponent(newUser.NIN)}&age=${encodeURIComponent(newUser.age)}&gender=${encodeURIComponent(newUser.gender)}&Stack=${encodeURIComponent(newUser.Stack)}&role=${encodeURIComponent(newUser.role)}&hub=${encodeURIComponent(hubId)}`;
+
+      const websiteUrl = 'https://pdcvp.netlify.app/';
+
+      // Generate the QR code containing the URL
+      const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
       await newUser.save();
 

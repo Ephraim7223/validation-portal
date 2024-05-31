@@ -12,8 +12,8 @@ export class CronJobService {
       const URL = 'https://portal-i49b.onrender.com/api/v1/auth/sign-in';
 
       const signInDto = {
-        email: 'test-admin@mail.com',
-        password: ' _tes@gift$go',
+        email: 'pdcvp@gmail.com',
+        password: 'JUSTICE',
       };
 
       const response = await axios.post(URL, signInDto, {
