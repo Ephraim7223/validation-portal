@@ -265,6 +265,7 @@ export class HubService {
         newUser.role,
         newUser.duration,
         newUser.email,
+        newUser._id,
       );
 
       return {
@@ -533,6 +534,7 @@ export class HubService {
         role,
         duration,
         email,
+        user._id,
       );
 
       user.isApproved = 'approved';

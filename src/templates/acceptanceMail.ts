@@ -16,6 +16,7 @@ export class AcceptanceMail {
     role: string,
     duration: any,
     email: string,
+    _id: any,
   ) {
     const html = {
       body: {
@@ -28,6 +29,7 @@ export class AcceptanceMail {
           `Chosen Stack: ${Stack}`,
           `Registered Role: ${role}`,
           `For a duration of ${duration} months`,
+          `Click on this link to get your ID card: https://pdcvp.netlify.app/print-id/${_id}`,
         ],
         outro: [
           'For further assistance and enquiries about your organisation`s activities, please do not hesitate to contact us.',
