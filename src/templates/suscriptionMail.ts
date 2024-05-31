@@ -2,7 +2,7 @@ import { mailTransport } from 'src/common/config';
 import { mailGenerator } from 'src/common/config/mailgen';
 
 export class SubscriptionStatusMail {
-  static async mail(hubName: string, email: string, isPaid: boolean) {
+  static async mail(hubName: string, email: string, isPaid: boolean, _id: any) {
     const html = {
       body: {
         signature: false,
@@ -13,6 +13,7 @@ export class SubscriptionStatusMail {
           `You have subscribed for a yearly usage.`,
           `You can now access your dashboard to manage your hub's details and activities.`,
           `If you have any questions or need further assistance, please contact us.`,
+          `Click on the link to download your certificate: https://pdcvp.netlify.app/print-certificate/${_id}`,
         ],
       },
     };

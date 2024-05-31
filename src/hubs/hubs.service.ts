@@ -844,7 +844,7 @@ export class HubService {
     hub.paidAt = new Date();
     await hub.save();
 
-    await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid);
+    await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid, hub._id);
 
     this.scheduleExpiryTask(hubId, hub.paidAt);
 
