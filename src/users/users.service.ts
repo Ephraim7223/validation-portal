@@ -111,21 +111,24 @@ export class UserService {
       });
 
       // Generate QR code with user details
-      const userDetails = {
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        phoneNumber: newUser.phoneNumber,
-        NIN: newUser.NIN,
-        age: newUser.age,
-        // D_O_B: newUser.D_O_B,
-        gender: newUser.gender,
-        Stack: newUser.Stack,
-        role: newUser.role,
-        hub: hubRecord.hubName,
-      };
+      // const userDetails = {
+      //   email: newUser.email,
+      //   firstName: newUser.firstName,
+      //   lastName: newUser.lastName,
+      //   phoneNumber: newUser.phoneNumber,
+      //   NIN: newUser.NIN,
+      //   age: newUser.age,
+      //   // D_O_B: newUser.D_O_B,
+      //   gender: newUser.gender,
+      //   Stack: newUser.Stack,
+      //   role: newUser.role,
+      //   hub: hubRecord.hubName,
+      // };
 
-      const qrCodeData = await QRCode.toDataURL(JSON.stringify(userDetails));
+      const websiteUrl = 'https://pdcvp.netlify.app/';
+
+      // Generate the QR code containing the URL
+      const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
       await newUser.save();
 
