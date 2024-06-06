@@ -865,7 +865,7 @@ export class HubService {
     this.logger.log(`Scheduling expiry task for hub ${hubId}`);
 
     const job = cron.schedule(
-      `*/1 * * * *`,
+      `*/20 * * * *`,
       async () => {
         try {
           const hub = await this.hubModel.findById(hubId);
@@ -876,19 +876,19 @@ export class HubService {
           }
 
           const now = new Date();
-          const fiveMinutesLater = new Date(paidAt.getTime() + 5 * 60000); // 5 minutes later
+          const twentyMinutesLater = new Date(paidAt.getTime() + 20 * 60000); // 20 minutes later
 
-          if (now >= fiveMinutesLater) {
+          if (now >= twentyMinutesLater) {
             hub.isPaid = false;
             await hub.save();
             this.logger.log(
-              `Updated hub ${hubId} isPaid to false after 5 minutes.`,
+              `Updated hub ${hubId} isPaid to false after 20 minutes.`,
             );
             await SubscriptionExpiryMail.mail(hub.hubName, hub.email);
             job.stop();
           } else {
             this.logger.log(
-              `Hub ${hubId} is still active. Next check in 1 minute.`,
+              `Hub ${hubId} is still active. Next check in 20 minutes.`,
             );
           }
         } catch (error) {
