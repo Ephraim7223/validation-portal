@@ -51,7 +51,7 @@ export class User {
   @Prop({ default: false })
   isActiveMailSent: boolean;
 
-  @Prop({ default: false })
+  @Prop({ default: true })
   isPaid: boolean;
 
   @Prop({})
