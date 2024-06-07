@@ -130,6 +130,7 @@ export class UserService {
       // Generate the QR code containing the URL
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
+      newUser.isPaid = true;
       await newUser.save();
 
       // Update hubs_users field in hubRecord
