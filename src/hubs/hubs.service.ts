@@ -67,7 +67,6 @@ export class HubService {
   }
 
   isValidObjectId(id: string): boolean {
-    // Add validation logic for ObjectId if needed
     return id.match(/^[0-9a-fA-F]{24}$/) != null;
   }
 
