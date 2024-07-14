@@ -57,9 +57,9 @@ export class HubsController {
   @Get('check-unique')
   async checkUniques(
     @Query('email') email: string,
-    @Query('phoneNumber') phoneNumber: string,
+    @Query('phone') phone: string,
   ) {
-    const result = await this.hubsService.checkUniqueField(email, phoneNumber);
+    const result = await this.hubsService.checkUniqueField(email, phone);
     return result;
   }
 
