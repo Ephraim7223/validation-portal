@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -22,6 +23,20 @@ import { responseFormatter } from 'src/utils/response.formatter';
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get('check-unique')
+  async checkUnique(
+    @Query('email') email: string,
+    @Query('phoneNumber') phoneNumber: string,
+    @Query('NIN') NIN: string,
+  ) {
+    const result = await this.userService.checkUniqueFields(
+      email,
+      phoneNumber,
+      NIN,
+    );
+    return result;
+  }
 
   @HttpCode(HttpStatus.OK)
   @Post('register')

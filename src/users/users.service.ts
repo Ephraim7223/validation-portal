@@ -35,6 +35,34 @@ export class UserService {
     return publicId;
   }
 
+  async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
+    const query: any = {};
+    if (email) query.email = email;
+    if (phoneNumber) query.phoneNumber = phoneNumber;
+    if (NIN) query.NIN = NIN;
+
+    const existingUser = await this.userModel.findOne(query);
+
+    if (existingUser) {
+      return {
+        statusCode: 409,
+        message: 'One or more fields already exist',
+        data: existingUser,
+        error: {
+          code: 'FIELD_ALREADY_EXIST',
+          message: 'One or more fields already exist',
+        },
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
+  }
+
   async register(createUserDto: CreateUserDto) {
     let response: any;
     const { email, hub, NIN, phoneNumber, D_O_B } = createUserDto;

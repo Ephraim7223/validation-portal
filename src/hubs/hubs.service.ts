@@ -57,6 +57,61 @@ export class HubService {
     return publicId;
   }
 
+  async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
+    const query: any = {};
+    if (email) query.email = email;
+    if (phoneNumber) query.phoneNumber = phoneNumber;
+    if (NIN) query.NIN = NIN;
+
+    const existingUser = await this.userModel.findOne(query);
+
+    if (existingUser) {
+      return {
+        statusCode: 409,
+        message: 'One or more fields already exist',
+        data: existingUser,
+        error: {
+          code: 'FIELD_ALREADY_EXIST',
+          message: 'One or more fields already exist',
+        },
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
+  }
+
+  async checkUniqueField(email?: string, phone?: string) {
+    const query: any = {};
+    if (email) query.email = email;
+    if (phone) query.phone = phone;
+
+    const existingUser = await this.hubModel.findOne(query);
+
+    if (existingUser) {
+      return {
+        statusCode: 409,
+        message: 'One or more fields already exist',
+        data: existingUser,
+        error: {
+          code: 'FIELD_ALREADY_EXIST',
+          message: 'One or more fields already exist',
+        },
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
+  }
+
   calculateDurationInMonths(startDate: Date, endDate: Date): number {
     const startYear = startDate.getFullYear();
     const startMonth = startDate.getMonth();

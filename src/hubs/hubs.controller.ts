@@ -18,6 +18,7 @@ import {
   Put,
   UsePipes,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import {
@@ -32,16 +33,35 @@ import {
   ApproveApplicationDto,
   ApproveUserDto,
   ScheduleInterviewDto,
-  // ApproveUserDto,
-  // ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
 import { JwtGuard } from 'src/guards';
-// import { AllowedRoles, Role } from 'src/decorator';
-// import { User } from 'src/users/schema';
 @Controller('hubs')
 export class HubsController {
   logger: any;
   constructor(private readonly hubsService: HubService) {}
+
+  @Get('check-unique')
+  async checkUnique(
+    @Query('email') email: string,
+    @Query('phoneNumber') phoneNumber: string,
+    @Query('NIN') NIN: string,
+  ) {
+    const result = await this.hubsService.checkUniqueFields(
+      email,
+      phoneNumber,
+      NIN,
+    );
+    return result;
+  }
+
+  @Get('check-unique')
+  async checkUniques(
+    @Query('email') email: string,
+    @Query('phoneNumber') phoneNumber: string,
+  ) {
+    const result = await this.hubsService.checkUniqueField(email, phoneNumber);
+    return result;
+  }
 
   @HttpCode(HttpStatus.OK)
   @Post('register')
