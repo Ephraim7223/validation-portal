@@ -30,12 +30,8 @@ export class UserController {
     @Query('phoneNumber') phoneNumber: string,
     @Query('NIN') NIN: string,
   ) {
-    const result = await this.userService.checkUniqueFields(
-      email,
-      phoneNumber,
-      NIN,
-    );
-    return result;
+    await this.userService.checkUniqueFields(email, phoneNumber, NIN);
+    // return result;
   }
 
   @HttpCode(HttpStatus.OK)
