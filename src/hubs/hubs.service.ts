@@ -150,13 +150,6 @@ export class HubService {
         },
       };
     }
-
-    return {
-      statusCode: 200,
-      message: 'Fields are unique',
-      data: null,
-      error: null,
-    };
   }
 
   async register(createHubDto: CreateHubDto) {
@@ -391,13 +384,6 @@ export class HubService {
         },
       };
     }
-
-    return {
-      statusCode: 200,
-      message: 'Fields are unique',
-      data: null,
-      error: null,
-    };
   }
 
   async login(signInDto: SignInDto) {

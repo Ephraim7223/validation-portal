@@ -46,8 +46,12 @@ export class HubsController {
     @Query('phoneNumber') phoneNumber: string,
     @Query('NIN') NIN: string,
   ) {
-    await this.hubsService.checkUniqueFields(email, phoneNumber, NIN);
-    // return result;
+    const result = await this.hubsService.checkUniqueFields(
+      email,
+      phoneNumber,
+      NIN,
+    );
+    return result;
   }
 
   @Get('check-unique')

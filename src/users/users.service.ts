@@ -61,13 +61,6 @@ export class UserService {
         },
       };
     }
-
-    return {
-      statusCode: 200,
-      message: 'Fields are unique',
-      data: null,
-      error: null,
-    };
   }
 
   async register(createUserDto: CreateUserDto) {
