@@ -57,60 +57,67 @@ export class HubService {
     return publicId;
   }
 
-  async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
-    const query: any = {};
-    if (email) query.email = email;
-    if (phoneNumber) query.phoneNumber = phoneNumber;
-    if (NIN) query.NIN = NIN;
+  // async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
+  //   const query: any = {};
+  //   if (email) query.email = email;
+  //   if (phoneNumber) query.phoneNumber = phoneNumber;
+  //   if (NIN) query.NIN = NIN;
 
-    const existingUser = await this.userModel.findOne(query);
+  //   const existingUser = await this.userModel.findOne(query);
 
-    if (existingUser) {
-      return {
-        statusCode: 409,
-        message: 'One or more fields already exist',
-        data: existingUser,
-        error: {
-          code: 'FIELD_ALREADY_EXIST',
-          message: 'One or more fields already exist',
-        },
-      };
-    }
+  //   if (existingUser) {
+  //     const existingFields = [];
+  //     if (existingUser.email === email) existingFields.push('email');
+  //     if (existingUser.phoneNumber === phoneNumber)
+  //       existingFields.push('phoneNumber');
+  //     if (existingUser.NIN === NIN) existingFields.push('NIN');
 
-    return {
-      statusCode: 200,
-      message: 'Fields are unique',
-      data: null,
-      error: null,
-    };
-  }
+  //     const message = `The following fields are already in use: ${existingFields.join(', ')}`;
+  //     return {
+  //       statusCode: 409,
+  //       message,
+  //       data: null,
+  //       error: {
+  //         code: 'FIELD_ALREADY_EXIST',
+  //         message,
+  //       },
+  //     };
+  //   }
 
-  async checkUniqueField(email?: string, phone?: string) {
-    const query: any = {};
-    if (email) query.email = email;
-    if (phone) query.phone = phone;
+  //   return {
+  //     statusCode: 200,
+  //     message: 'Fields are unique',
+  //     data: null,
+  //     error: null,
+  //   };
+  // }
 
-    const existingUser = await this.hubModel.findOne(query);
+  // async checkUniqueField(email?: string, phone?: string) {
+  //   const query: any = {};
+  //   if (email) query.email = email;
+  //   if (phone) query.phone = phone;
 
-    if (existingUser) {
-      return {
-        statusCode: 409,
-        message: 'One or more fields already exist',
-        data: existingUser,
-        error: {
-          code: 'FIELD_ALREADY_EXIST',
-          message: 'One or more fields already exist',
-        },
-      };
-    }
+  //   const existingUser = await this.hubModel.findOne(query);
 
-    return {
-      statusCode: 200,
-      message: 'Fields are unique',
-      data: null,
-      error: null,
-    };
-  }
+  //   if (existingUser) {
+  //     return {
+  //       statusCode: 409,
+  //       message: 'One or more fields already exist',
+  //       data: existingUser,
+  //       error: {
+  //         code: 'FIELD_ALREADY_EXIST',
+  //         message: 'One or more fields already exist',
+  //       },
+  //     };
+  //   }
+
+  //   return {
+  //     statusCode: 200,
+  //     message: 'Fields are unique',
+  //     data: null,
+  //     error: null,
+  //   };
+  // }
 
   calculateDurationInMonths(startDate: Date, endDate: Date): number {
     const startYear = startDate.getFullYear();
@@ -125,6 +132,33 @@ export class HubService {
     return id.match(/^[0-9a-fA-F]{24}$/) != null;
   }
 
+  async checkUniqueField(email?: string, phone?: string) {
+    const query: any = {};
+    if (email) query.email = email;
+    if (phone) query.phone = phone;
+
+    const existingHub = await this.hubModel.findOne(query);
+
+    if (existingHub) {
+      return {
+        statusCode: 409,
+        message: 'One or more fields already exist',
+        data: existingHub,
+        error: {
+          code: 'FIELD_ALREADY_EXIST',
+          message: 'One or more fields already exist',
+        },
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
+  }
+
   async register(createHubDto: CreateHubDto) {
     let response: any;
     const { email, hubName, phone } = createHubDto;
@@ -134,32 +168,22 @@ export class HubService {
       return { message: 'Invalid phone number format' };
     }
 
-    this.logger.log('Looking for a hub with an existing email');
-    const existingHub = await this.hubModel.findOne({
-      $or: [{ email }, { phone }],
-    });
+    const uniqueCheckResult = await this.checkUniqueField(email, phone);
+    if (uniqueCheckResult.statusCode === 409) {
+      return uniqueCheckResult;
+    }
 
-    if (existingHub) {
-      response = {
-        statusCode: 409,
-        message: 'Hub with existing email or phonealready exists',
-        data: null,
-        error: {
-          code: 'HUB_ALREADY_EXIST',
-          message: 'Hub with existing email or phone already exists',
-        },
-      };
-    } else {
-      this.logger.log(`uploading CAC to cloud...`);
+    try {
+      this.logger.log('Uploading CAC to cloud...');
       const CAC = await this.cloudinary.upload(createHubDto.CAC[0]);
 
-      this.logger.log(`uploading logo to cloud...`);
+      this.logger.log('Uploading logo to cloud...');
       const logo = await this.cloudinary.upload(createHubDto.logo[0]);
 
       delete createHubDto.CAC;
       delete createHubDto.logo;
 
-      this.logger.log(`creating new application...`);
+      this.logger.log('Creating new application...');
       const hashedPassword = await argon.hash(createHubDto.password);
 
       const hubId = generateHubID(hubName);
@@ -172,14 +196,22 @@ export class HubService {
         logo: logo.secure_url,
       });
 
-      this.logger.log(`sending success email`);
+      this.logger.log('Sending success email');
       await SuccessMail.mail(newHub.hubName, newHub.email);
 
       response = {
         statusCode: 201,
-        message: 'hub created successfully',
+        message: 'Hub created successfully',
         data: newHub,
         error: null,
+      };
+    } catch (error) {
+      this.logger.error('Error creating hub', error);
+      response = {
+        statusCode: 500,
+        message: 'Internal server error',
+        data: null,
+        error,
       };
     }
 
@@ -229,25 +261,14 @@ export class HubService {
         age--;
       }
 
-      const existingUser = await this.userModel.findOne({
-        $or: [
-          { email },
-          { phoneNumber: phoneNumberAsNumber },
-          { NIN: ninAsNumber },
-        ],
-      });
-      if (existingUser) {
-        return {
-          statusCode: 409,
-          message:
-            'User with existing email, phone number, or NIN already exists',
-          data: null,
-          error: {
-            code: 'USER_ALREADY_EXIST',
-            message:
-              'User with existing email, phone number, or NIN already exists',
-          },
-        };
+      // Check for existing user
+      const uniqueCheckResult = await this.checkUniqueFields(
+        email,
+        phoneNumber,
+        NIN,
+      );
+      if (uniqueCheckResult.statusCode === 409) {
+        return uniqueCheckResult;
       }
 
       this.logger.log(`Uploading profile picture to cloud...`);
@@ -342,6 +363,41 @@ export class HubService {
         error,
       };
     }
+  }
+
+  async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
+    const query: any = {};
+    if (email) query.email = email;
+    if (phoneNumber) query.phoneNumber = parseInt(phoneNumber);
+    if (NIN) query.NIN = parseInt(NIN);
+
+    const existingUser = await this.userModel.findOne(query);
+
+    if (existingUser) {
+      const existingFields = [];
+      if (existingUser.email === email) existingFields.push('email');
+      if (existingUser.phoneNumber === parseInt(phoneNumber))
+        existingFields.push('phoneNumber');
+      if (existingUser.NIN === parseInt(NIN)) existingFields.push('NIN');
+
+      const message = `The following fields are already in use: ${existingFields.join(', ')}`;
+      return {
+        statusCode: 409,
+        message,
+        data: null,
+        error: {
+          code: 'FIELD_ALREADY_EXIST',
+          message,
+        },
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
   }
 
   async login(signInDto: SignInDto) {
