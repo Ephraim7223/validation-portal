@@ -41,3 +41,23 @@ export class SignUpDto {
 //   @IsString()
 //   password: string;
 // }
+
+export class ForgotPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  otp: string;
+
+  @IsNotEmpty()
+  @IsString()
+  newPassword: string;
+
+  @IsNotEmpty()
+  @IsString()
+  confirmPassword: string;
+}

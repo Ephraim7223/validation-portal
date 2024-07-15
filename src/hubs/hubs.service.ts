@@ -36,11 +36,15 @@ import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
 import { SubscriptionStatusMail } from 'src/templates/suscriptionMail';
 import { SubscriptionExpiryMail } from 'src/templates/expiredSuscriptionMail';
+import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
+import { IResponse } from 'src/interfaces';
+import { PasswordResetMail } from 'src/templates/password.reset.mail';
 
 @Injectable()
 export class HubService {
   private readonly logger = new Logger(HubService.name);
-
+  private readonly otps: Map<string, { otp: string; timer: NodeJS.Timeout }> =
+    new Map();
   constructor(
     @InjectModel(Hub.name)
     private readonly hubModel: Model<Hub>,
@@ -49,6 +53,10 @@ export class HubService {
     private readonly userModel: Model<User>,
     private readonly cloudinary1: CloudinaryService,
   ) {}
+
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
 
   private getPublicIdFromUrl(imageUrl: string): string {
     const parts = imageUrl.split('/');
@@ -123,6 +131,93 @@ export class HubService {
 
   isValidObjectId(id: string): boolean {
     return id.match(/^[0-9a-fA-F]{24}$/) != null;
+  }
+
+  async forgotPassword(
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<IResponse> {
+    const { email } = forgotPasswordDto;
+
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+
+    const user = await this.hubModel.findOne({ email });
+
+    if (!user) {
+      throw new NotFoundException(`User with email ${email} not found`);
+    }
+
+    const otp = this.generateOtp();
+    const timeoutMinutes = 10;
+
+    user.otp = otp;
+    user.otpCreatedAt = new Date();
+    await user.save();
+
+    setTimeout(
+      async () => {
+        const userToUpdate = await this.hubModel.findOne({ email });
+        if (userToUpdate && userToUpdate.otp === otp) {
+          userToUpdate.otp = undefined;
+          userToUpdate.otpCreatedAt = undefined;
+          await userToUpdate.save();
+          this.logger.log(
+            `Expired OTP for user ${email} cleared from database`,
+          );
+        }
+      },
+      timeoutMinutes * 60 * 1000,
+    );
+    await PasswordResetMail.sendOtp(email, otp, timeoutMinutes);
+
+    return {
+      statusCode: 200,
+      message: 'OTP sent to email',
+      data: null,
+      error: null,
+    };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<IResponse> {
+    const { otp, newPassword, confirmPassword } = resetPasswordDto;
+
+    if (!otp || !newPassword || !confirmPassword) {
+      throw new BadRequestException(
+        'OTP, newPassword, and confirmPassword are required',
+      );
+    }
+
+    const user = await this.hubModel.findOne({ otp });
+
+    if (!user || user.otp !== otp || !user.otpCreatedAt) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+
+    const otpCreationTime = user.otpCreatedAt.getTime();
+    const now = Date.now();
+    const timeoutMinutes = 10;
+
+    if (now - otpCreationTime > timeoutMinutes * 60 * 1000) {
+      throw new UnauthorizedException('OTP has expired');
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const hashedPassword = await argon.hash(newPassword);
+    user.password = hashedPassword;
+    user.otp = undefined;
+    user.otpCreatedAt = undefined;
+    await user.save();
+
+    return {
+      statusCode: 200,
+      message: 'Password reset successfully',
+      data: null,
+      error: null,
+    };
   }
 
   async register(createHubDto: CreateHubDto) {

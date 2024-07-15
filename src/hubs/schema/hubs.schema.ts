@@ -55,6 +55,12 @@ export class Hub {
   paidAt: Date;
 
   _id: any;
+
+  @Prop({ default: null })
+  otp?: string;
+
+  @Prop({ type: Date, default: undefined })
+  otpCreatedAt?: Date;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

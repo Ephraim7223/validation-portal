@@ -35,6 +35,8 @@ import {
   ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
 import { JwtGuard } from 'src/guards';
+import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
+import { IResponse } from 'src/interfaces';
 @Controller('hubs')
 export class HubsController {
   logger: any;
@@ -307,5 +309,17 @@ export class HubsController {
     @Body() updatePaidStatusDto: UpdatePaidStatusDto,
   ) {
     return this.hubsService.updatePaidStatus(id, updatePaidStatusDto);
+  }
+
+  @Patch('forgot-password')
+  async forgotPassword(
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<IResponse> {
+    return this.hubsService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Patch('reset-password')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.hubsService.resetPassword(resetPasswordDto);
   }
 }
