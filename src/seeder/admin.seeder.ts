@@ -15,22 +15,21 @@ export class AdminSeeder implements Seeder {
   async seed(): Promise<any> {
     const newAdmin: Admin[] = [
       {
-        email: 'giftgo@gmail.com',
+        email: 'admin@gmail.com',
         name: 'Giftgo',
         phone: '+234 703 506 1222',
-        password: await argon.hash('etrtrfhn'),
+        password: await argon.hash('admin'),
         role: 'admin',
       },
       {
-        email: 'test-admin@mail.com',
+        email: 'supadmin@mail.com',
         name: 'Test Admin',
         phone: '+234 701 711 1908',
-        password: await argon.hash(' _tes@gift$go'),
+        password: await argon.hash('SupAdmin'),
         role: 'Super-admin',
       },
     ];
 
-    // Insert into the database.
     return this.AdminModel.insertMany(newAdmin);
   }
 
