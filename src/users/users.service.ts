@@ -38,29 +38,29 @@ export class UserService {
   async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
     const query: any = {};
     if (email) query.email = email;
-    if (phoneNumber) query.phoneNumber = parseInt(phoneNumber);
-    if (NIN) query.NIN = parseInt(NIN);
+    if (phoneNumber) query.phoneNumber = phoneNumber;
+    if (NIN) query.NIN = NIN;
 
     const existingUser = await this.userModel.findOne(query);
 
     if (existingUser) {
-      const existingFields = [];
-      if (existingUser.email === email) existingFields.push('email');
-      if (existingUser.phoneNumber === parseInt(phoneNumber))
-        existingFields.push('phoneNumber');
-      if (existingUser.NIN === parseInt(NIN)) existingFields.push('NIN');
-
-      const message = `The following fields are already in use: ${existingFields.join(', ')}`;
       return {
         statusCode: 409,
-        message,
-        data: null,
+        message: 'One or more fields already exist',
+        data: existingUser,
         error: {
           code: 'FIELD_ALREADY_EXIST',
-          message,
+          message: 'One or more fields already exist',
         },
       };
     }
+
+    return {
+      statusCode: 200,
+      message: 'Fields are unique',
+      data: null,
+      error: null,
+    };
   }
 
   async register(createUserDto: CreateUserDto) {
@@ -89,85 +89,98 @@ export class UserService {
       age--;
     }
 
-    const uniqueCheckResult = await this.checkUniqueFields(
-      email,
-      phoneNumber,
-      NIN,
-    );
-    if (uniqueCheckResult.statusCode === 409) {
-      return uniqueCheckResult;
-    }
-
-    this.logger.log(`Checking if hub exists...`);
-    const hubRecord = await this.hubModel.findOne({ hubName: hub });
-    if (!hubRecord) {
-      throw new BadRequestException('Hub does not exist.');
-    }
-
-    this.logger.log(`Uploading profile-picture to cloud...`);
-    const profilePic = await this.cloudinary.upload(
-      createUserDto.profilePic[0],
-    );
-    delete createUserDto.profilePic;
-
-    const userCount = await this.userModel.countDocuments({
-      hub: hubRecord._id,
+    this.logger.log('Looking for a user with an existing email');
+    const existingUser = await this.userModel.findOne({
+      $or: [
+        { email },
+        { phoneNumber: phoneNumberAsNumber },
+        { NIN: ninAsNumber },
+      ],
     });
-    await this.hubModel.updateOne({ _id: hubRecord._id }, { userCount });
+    if (existingUser) {
+      return {
+        statusCode: 409,
+        message:
+          'User with existing email, phone number, or NIN already exists',
+        data: null,
+        error: {
+          code: 'USER_ALREADY_EXIST',
+          message:
+            'User with existing email, phone number, or NIN already exists',
+        },
+      };
+    } else {
+      this.logger.log(`Checking if hub exists...`);
+      const hubRecord = await this.hubModel.findOne({ hubName: hub });
+      if (!hubRecord) {
+        throw new BadRequestException('Hub does not exist.');
+      }
 
-    this.logger.log(`Creating new user...`);
-    const newUser = await this.userModel.create({
-      ...createUserDto,
-      hub: hubRecord._id,
-      NIN: ninAsNumber,
-      phoneNumber: phoneNumberAsNumber,
-      profilePic: profilePic.secure_url,
-      age,
-      userID: generateUserID(createUserDto.role),
-    });
+      this.logger.log(`Uploading profile-picture to cloud...`);
+      const profilePic = await this.cloudinary.upload(
+        createUserDto.profilePic[0],
+      );
+      delete createUserDto.profilePic;
 
-    // Generate QR code with user details
-    // const userDetails = {
-    //   email: newUser.email,
-    //   firstName: newUser.firstName,
-    //   lastName: newUser.lastName,
-    //   phoneNumber: newUser.phoneNumber,
-    //   NIN: newUser.NIN,
-    //   age: newUser.age,
-    //   // D_O_B: newUser.D_O_B,
-    //   gender: newUser.gender,
-    //   Stack: newUser.Stack,
-    //   role: newUser.role,
-    //   hub: hubRecord.hubName,
-    // };
+      const userCount = await this.userModel.countDocuments({
+        hub: hubRecord._id,
+      });
+      await this.hubModel.updateOne({ _id: hubRecord._id }, { userCount });
 
-    const websiteUrl = 'https://pdcvp.netlify.app/';
+      this.logger.log(`Creating new user...`);
+      const newUser = await this.userModel.create({
+        ...createUserDto,
+        hub: hubRecord._id,
+        NIN: ninAsNumber,
+        phoneNumber: phoneNumberAsNumber,
+        profilePic: profilePic.secure_url,
+        age,
+        userID: generateUserID(createUserDto.role),
+      });
 
-    // Generate the QR code containing the URL
-    const qrCodeData = await QRCode.toDataURL(websiteUrl);
-    newUser.qrcode = qrCodeData;
-    newUser.isPaid = true;
-    await newUser.save();
+      // Generate QR code with user details
+      // const userDetails = {
+      //   email: newUser.email,
+      //   firstName: newUser.firstName,
+      //   lastName: newUser.lastName,
+      //   phoneNumber: newUser.phoneNumber,
+      //   NIN: newUser.NIN,
+      //   age: newUser.age,
+      //   // D_O_B: newUser.D_O_B,
+      //   gender: newUser.gender,
+      //   Stack: newUser.Stack,
+      //   role: newUser.role,
+      //   hub: hubRecord.hubName,
+      // };
 
-    // Update hubs_users field in hubRecord
-    if (!hubRecord.hubs_users.includes(newUser._id)) {
-      hubRecord.hubs_users.push(newUser._id);
-      await hubRecord.save();
+      const websiteUrl = 'https://pdcvp.netlify.app/';
+
+      // Generate the QR code containing the URL
+      const qrCodeData = await QRCode.toDataURL(websiteUrl);
+      newUser.qrcode = qrCodeData;
+      newUser.isPaid = true;
+      await newUser.save();
+
+      // Update hubs_users field in hubRecord
+      if (!hubRecord.hubs_users.includes(newUser._id)) {
+        hubRecord.hubs_users.push(newUser._id);
+        await hubRecord.save();
+      }
+
+      this.logger.log(`Sending successful application email`);
+      await ApplicationMail.mail(
+        newUser.firstName,
+        newUser.lastName,
+        newUser.email,
+      );
+
+      response = {
+        statusCode: 201,
+        message: 'User saved successfully',
+        data: newUser,
+        error: null,
+      };
     }
-
-    this.logger.log(`Sending successful application email`);
-    await ApplicationMail.mail(
-      newUser.firstName,
-      newUser.lastName,
-      newUser.email,
-    );
-
-    response = {
-      statusCode: 201,
-      message: 'User saved successfully',
-      data: newUser,
-      error: null,
-    };
 
     this.logger.log(response);
     return response;
