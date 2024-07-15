@@ -155,13 +155,11 @@ export class UserService {
 
       const websiteUrl = 'https://pdcvp.netlify.app/';
 
-      // Generate the QR code containing the URL
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
       newUser.isPaid = true;
       await newUser.save();
 
-      // Update hubs_users field in hubRecord
       if (!hubRecord.hubs_users.includes(newUser._id)) {
         hubRecord.hubs_users.push(newUser._id);
         await hubRecord.save();
@@ -221,16 +219,13 @@ export class UserService {
 
   async deleteUser(id: string) {
     try {
-      // Find the user to get the related hub ID
       const user = await this.userModel.findById(id);
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
-      // Delete the user
       await this.userModel.findByIdAndDelete(id);
 
-      // Update the hub to remove the user ID from hubs_users
       await this.hubModel.updateOne(
         { _id: user.hub },
         { $pull: { hubs_users: user._id } },
@@ -250,15 +245,12 @@ export class UserService {
 
   async deleteAllUsers() {
     try {
-      // Get all users to find the related hub IDs
       const users = await this.userModel.find({});
       const userIDs = users.map((user) => user._id);
       const hubIDs = users.map((user) => user.hub);
 
-      // Delete all users
       const result = await this.userModel.deleteMany({});
 
-      // Update all hubs to remove the user IDs from hubs_users
       await this.hubModel.updateMany(
         { _id: { $in: hubIDs } },
         { $pull: { hubs_users: { $in: userIDs } } },
@@ -433,13 +425,11 @@ export class UserService {
         throw new BadRequestException('User is already suspended');
       }
 
-      // Perform suspension
       userToSuspend.isActive = false;
       userToSuspend.isPendingSuspension = false;
       userToSuspend.suspensionReason = suspensionReason;
       const updatedUser = await userToSuspend.save();
 
-      // Notify user about suspension
       await UserSuspensionMail.mail(
         updatedUser.firstName,
         updatedUser.lastName,
@@ -456,7 +446,7 @@ export class UserService {
       };
     } catch (error) {
       if (error instanceof BadRequestException) {
-        throw error; // Re-throw BadRequestException to propagate the error message
+        throw error;
       }
       this.logger.error(`Error suspending user: ${error.message}`);
       throw new BadRequestException('Internal Server Error');
@@ -474,11 +464,9 @@ export class UserService {
         throw new BadRequestException('User is not suspended');
       }
 
-      // Perform unsuspension
       userToUnsuspend.isActive = true;
       const updatedUser = await userToUnsuspend.save();
 
-      // Notify user about unsuspension
       await UserUnSuspensionMail.mail(
         updatedUser.firstName,
         updatedUser.lastName,
@@ -497,7 +485,7 @@ export class UserService {
         error instanceof BadRequestException ||
         error instanceof NotFoundException
       ) {
-        throw error; // Re-throw BadRequestException or NotFoundException to propagate the error message
+        throw error;
       }
       this.logger.error(`Error unsuspending user: ${error.message}`);
       throw new BadRequestException('Internal Server Error');

@@ -106,7 +106,7 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtGuard) // Protect the route with JWT authentication
+  @UseGuards(JwtGuard)
   @Post('register-user')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
@@ -115,7 +115,7 @@ export class HubsController {
     @Body() createUserDto: ApproveUserDto,
     @Req() req,
   ) {
-    const hubId = req.user._id; // assuming the JWT contains the hub ID
+    const hubId = req.user._id;
     if (!file.profilePic) {
       return {
         statusCode: 400,
@@ -211,14 +211,14 @@ export class HubsController {
   @UseGuards(new JwtGuard(['hub']))
   @Get('users/users')
   async getUsersUnderHub(@Req() req) {
-    const hubId = req.user._id; // Extract hub ID from authenticated user
+    const hubId = req.user._id;
     return this.hubsService.getUsersUnderHub(hubId);
   }
 
   @UseGuards(new JwtGuard(['hub']))
   @Get('users/users/:userId')
   async getSingleUser(@Req() req, @Param('userId') userId: string) {
-    const hubId = req.user._id; // Extract hub ID from authenticated user
+    const hubId = req.user._id;
     return this.hubsService.getSingleUser(hubId, userId);
   }
 
@@ -246,7 +246,7 @@ export class HubsController {
     @Param('id') id: string,
     @Body() interviewDto: ScheduleInterviewDto,
   ) {
-    const hubId = req.user._id; // assuming the JWT contains the hub ID
+    const hubId = req.user._id;
     try {
       const result = await this.hubsService.scheduleInterview(
         id,
@@ -269,7 +269,7 @@ export class HubsController {
   // @Get('users/pending-interview')
   @Get('users/pending-interview')
   async getUsersPendingInterview(@Req() req) {
-    const hubId = req.user._id; // Assuming hubId is stored in the user property of the request object
+    const hubId = req.user._id;
     return this.hubsService.getUsersPendingInterview(hubId);
   }
 

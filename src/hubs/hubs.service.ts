@@ -309,7 +309,6 @@ export class HubService {
 
       const websiteUrl = 'https://pdcvp.netlify.app/';
 
-      // Generate the QR code containing the URL
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
       await newUser.save();
@@ -930,7 +929,7 @@ export class HubService {
           }
 
           const now = new Date();
-          const twentyMinutesLater = new Date(paidAt.getTime() + 20 * 60000); // 20 minutes later
+          const twentyMinutesLater = new Date(paidAt.getTime() + 20 * 60000);
 
           if (now >= twentyMinutesLater) {
             hub.isPaid = false;

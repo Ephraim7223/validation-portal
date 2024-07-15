@@ -10,7 +10,6 @@ import { User, UserSchema } from 'src/users/schema';
 
 @Module({
   imports: [
-    // JwtModule.register({}),
     MongooseModule.forFeature([
       { name: Admin.name, schema: AdminSchema },
       { name: Hub.name, schema: HubSchema },
