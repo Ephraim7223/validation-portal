@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schema';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { Hub } from 'src/hubs/schema/hubs.schema';
 import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
@@ -15,6 +15,8 @@ import { UserSuspensionMail } from 'src/templates/suspendedUserMail';
 import { UserUnSuspensionMail } from 'src/templates/unsuspendedUserMail';
 import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 import { generateUserID } from 'src/functions/genrating-random-number';
+import { Admin } from 'src/auth/schema';
+import { IResponse } from 'src/interfaces/response.interface';
 
 @Injectable()
 export class UserService {
@@ -26,7 +28,13 @@ export class UserService {
     private readonly cloudinary: CloudinaryService,
     @InjectModel(Hub.name)
     private readonly hubModel: Model<Hub>,
+    @InjectModel(Admin.name)
+    private readonly adminModel: Model<Admin>,
   ) {}
+
+  isValidObjectId(id: string): boolean {
+    return mongoose.Types.ObjectId.isValid(id);
+  }
 
   private getPublicIdFromUrl(imageUrl: string): string {
     const parts = imageUrl.split('/');
@@ -490,5 +498,39 @@ export class UserService {
       this.logger.error(`Error unsuspending user: ${error.message}`);
       throw new BadRequestException('Internal Server Error');
     }
+  }
+
+  async getMe(adminId: string): Promise<IResponse> {
+    if (!this.isValidObjectId(adminId)) {
+      throw new BadRequestException('Invalid admin ID format');
+    }
+
+    const admin = await this.adminModel.findById(adminId).select({
+      password: 0,
+      otp: 0,
+      otpCreatedAt: 0,
+    });
+
+    if (!admin) {
+      throw new NotFoundException('Admin not found');
+    }
+
+    // Find hubs associated with this admin
+    const managedHubs = await this.hubModel.find({ admin: adminId }).select({
+      password: 0,
+      otp: 0,
+      otpCreatedAt: 0,
+    });
+
+    // Create a response object that includes admin details and associated hubs
+    return {
+      statusCode: 200,
+      message: 'Admin details retrieved successfully',
+      data: {
+        admin,
+        hubs: managedHubs,
+      },
+      error: null,
+    };
   }
 }

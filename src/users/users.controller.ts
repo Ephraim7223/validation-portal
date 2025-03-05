@@ -10,7 +10,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './users.service';
@@ -18,6 +20,8 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
+import { JwtGuard } from 'src/guards';
+import { IResponse } from 'src/interfaces';
 // import { JwtGuard } from 'src/guards';
 
 @Controller('users')
@@ -186,5 +190,12 @@ export class UserController {
     }
 
     return await this.userService.getUsersByOrganisation(organisation);
+  }
+
+  @Post('admin/me')
+  @UseGuards(JwtGuard)
+  async getMe(@Req() req): Promise<IResponse> {
+    const adminId = req.user._id;
+    return this.userService.getMe(adminId);
   }
 }
