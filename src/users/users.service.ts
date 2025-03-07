@@ -146,7 +146,7 @@ export class UserService {
         userID: generateUserID(createUserDto.role),
       });
 
-      const websiteUrl = 'https://pdcvp.netlify.app/';
+      const websiteUrl = 'https://verifytech.netlify.app/';
 
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
