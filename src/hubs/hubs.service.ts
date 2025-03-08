@@ -402,7 +402,7 @@ export class HubService {
       // };
       // const websiteUrl = `https://www.example.com?email=${encodeURIComponent(newUser.email)}&firstName=${encodeURIComponent(newUser.firstName)}&lastName=${encodeURIComponent(newUser.lastName)}&phoneNumber=${encodeURIComponent(newUser.phoneNumber)}&NIN=${encodeURIComponent(newUser.NIN)}&age=${encodeURIComponent(newUser.age)}&gender=${encodeURIComponent(newUser.gender)}&Stack=${encodeURIComponent(newUser.Stack)}&role=${encodeURIComponent(newUser.role)}&hub=${encodeURIComponent(hubId)}`;
 
-      const websiteUrl = 'https://pdcvp.netlify.app/';
+      const websiteUrl = 'https://verifytech.netlify.app/';
 
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
