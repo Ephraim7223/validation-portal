@@ -150,7 +150,6 @@ export class UserController {
     @Body() suspensionDto: SuspensionDto,
   ): Promise<any> {
     try {
-      // Check user role (hub or admin) and call the appropriate method
       const result = await this.userService.suspendUser(id, suspensionDto);
       return result;
     } catch (error) {
