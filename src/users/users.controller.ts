@@ -22,7 +22,6 @@ import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import { JwtGuard } from 'src/guards';
 import { IResponse } from 'src/interfaces';
-// import { JwtGuard } from 'src/guards';
 
 @Controller('users')
 export class UserController {
