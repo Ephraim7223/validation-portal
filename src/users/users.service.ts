@@ -342,8 +342,6 @@ export class UserService {
       const searchResults = await this.userModel.find({
         $or: [
           { email: { $regex: query, $options: 'i' } },
-          // { phoneNumber: { $regex: query, $options: '' } },
-          // { NIN: { $regex: query, $options: '' } },
           { role: { $regex: query, $options: 'i' } },
           { Stack: { $regex: query, $options: 'i' } },
           { userID: { $regex: query, $options: 'i' } },
