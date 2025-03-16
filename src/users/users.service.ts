@@ -498,14 +498,12 @@ export class UserService {
       throw new NotFoundException('Admin not found');
     }
 
-    // Find hubs associated with this admin
     const managedHubs = await this.hubModel.find({ admin: adminId }).select({
       password: 0,
       otp: 0,
       otpCreatedAt: 0,
     });
 
-    // Create a response object that includes admin details and associated hubs
     return {
       statusCode: 200,
       message: 'Admin details retrieved successfully',
