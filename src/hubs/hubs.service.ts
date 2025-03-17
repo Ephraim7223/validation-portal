@@ -1059,14 +1059,12 @@ export class HubService {
       throw new NotFoundException('Hub not found');
     }
 
-    // Find users associated with this hub
     const hubUsers = await this.userModel.find({ hub: hubId }).select({
       password: 0,
       otp: 0,
       otpCreatedAt: 0,
     });
 
-    // Create a response object that includes hub details and its users
     return {
       statusCode: 200,
       message: 'Hub details retrieved successfully',
