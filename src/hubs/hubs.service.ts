@@ -512,13 +512,24 @@ export class HubService {
   async getSingleHub(id: string) {
     try {
       const hub = await this.hubModel.findById(id).populate('hubs_users');
+
       if (!hub) {
         throw new NotFoundException('Hub not found');
       }
+
+      let expiryDate = null;
+      if (hub.isPaid && hub.paidAt) {
+        expiryDate = new Date(hub.paidAt);
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      }
+
       return {
         statusCode: 200,
         message: 'Hub retrieved successfully',
-        data: hub,
+        data: {
+          ...hub.toObject(),
+          expiryDate: expiryDate,
+        },
         error: null,
       };
     } catch (error) {
