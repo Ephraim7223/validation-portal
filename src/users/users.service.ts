@@ -195,13 +195,34 @@ export class UserService {
   async getUserById(id: string) {
     try {
       const user = await this.userModel.findById(id).populate('hub');
+
       if (!user) {
         throw new NotFoundException('User not found');
       }
+
+      let hubExpiryDate = null;
+      if (user.hub && user.hub.isPaid && user.hub.paidAt) {
+        hubExpiryDate = new Date(user.hub.paidAt);
+        hubExpiryDate.setFullYear(hubExpiryDate.getFullYear() + 1);
+      }
+
+      let userExpiryDate = null;
+      if (user.expiryDate) {
+        userExpiryDate = user.expiryDate;
+      } else if (user.start_date && user.duration) {
+        const startDate = new Date(user.start_date);
+        userExpiryDate = new Date(startDate);
+        userExpiryDate.setMonth(startDate.getMonth() + user.duration);
+      }
+
       return {
         statusCode: 200,
         message: 'User retrieved successfully',
-        data: user,
+        data: {
+          ...user.toObject(),
+          calculatedExpiryDate: userExpiryDate,
+          hubExpiryDate: hubExpiryDate,
+        },
         error: null,
       };
     } catch (error) {
