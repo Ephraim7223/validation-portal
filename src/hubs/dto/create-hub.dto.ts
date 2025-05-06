@@ -1,4 +1,11 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+} from 'class-validator';
+import { categoryEnum } from 'src/users/schema';
 
 export class CreateHubDto {
   @IsString()
@@ -22,6 +29,10 @@ export class CreateHubDto {
   @IsString()
   @IsNotEmpty()
   address: string;
+
+  @IsNotEmpty()
+  @IsEnum(categoryEnum)
+  category: categoryEnum;
 
   @IsString()
   @IsNotEmpty()

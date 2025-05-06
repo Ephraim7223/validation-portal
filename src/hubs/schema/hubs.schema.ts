@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
+import { categoryEnum } from 'src/users/schema';
 // import { User } from 'src/users/schema/index';
 
 export type HubDocument = HydratedDocument<Hub>;
@@ -61,6 +62,9 @@ export class Hub {
 
   @Prop({ type: Date, default: undefined })
   otpCreatedAt?: Date;
+
+  @Prop({ type: categoryEnum, required: true })
+  category: string;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

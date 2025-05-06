@@ -20,3 +20,14 @@ export enum IsApproved {
   'approved',
   'declined',
 }
+
+export enum categoryEnum {
+  'Innovation Hubs',
+  'Business Centers',
+  'Training Centers',
+  'Jamb Centers',
+  'Startups',
+  'Freelancers',
+  'Creatives',
+  'ICT Company',
+}
