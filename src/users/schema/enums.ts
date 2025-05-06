@@ -22,12 +22,12 @@ export enum IsApproved {
 }
 
 export enum categoryEnum {
-  'Innovation Hubs',
-  'Business Centers',
-  'Training Centers',
-  'Jamb Centers',
-  'Startups',
-  'Freelancers',
-  'Creatives',
-  'ICT Company',
+  INNOVATION_HUBS = 'Innovation Hubs',
+  BUSINESS_CENTERS = 'Business Centers',
+  TRAINING_CENTERS = 'Training Centers',
+  JAMB_CENTERS = 'Jamb Centers',
+  STARTUPS = 'Startups',
+  FREELANCERS = 'Freelancers',
+  CREATIVES = 'Creatives',
+  ICT_COMPANY = 'ICT Company',
 }

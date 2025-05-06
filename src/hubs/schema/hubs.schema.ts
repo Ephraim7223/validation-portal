@@ -63,7 +63,7 @@ export class Hub {
   @Prop({ type: Date, default: undefined })
   otpCreatedAt?: Date;
 
-  @Prop({ type: categoryEnum, required: true })
+  @Prop({ type: String, enum: Object.values(categoryEnum), required: true })
   category: string;
 }
 
