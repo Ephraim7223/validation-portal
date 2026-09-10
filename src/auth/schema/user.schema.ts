@@ -14,10 +14,10 @@ export class Admin {
   @Prop({ required: true })
   phone: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   password: string;
 
-  @Prop()
+  @Prop({ select: false })
   secretToken?: string;
 
   @Prop({ default: 'admin' })

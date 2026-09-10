@@ -3,8 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 
 export class JwtHelper {
   static signToken(sub: any, role: string): { token: string } {
+    const secret = process.env.JWT_ACCESS_SECRET;
+    if (!secret) {
+      throw new UnauthorizedException('JWT secret is not configured');
+    }
+
     const jwtService = new JwtService({
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret,
     });
 
     const payload = {
@@ -12,7 +17,10 @@ export class JwtHelper {
       role,
     };
 
-    const token = jwtService.sign(payload, { expiresIn: '7d' });
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+    const token = jwtService.sign(payload, {
+      expiresIn: expiresIn as `${number}${'s' | 'm' | 'h' | 'd'}`,
+    });
 
     return {
       token,
@@ -20,15 +28,20 @@ export class JwtHelper {
   }
 
   static verifyToken(token: string) {
+    const secret = process.env.JWT_ACCESS_SECRET;
+    if (!secret) {
+      throw new UnauthorizedException('JWT secret is not configured');
+    }
+
     const jwtService = new JwtService({
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret,
     });
 
     try {
       return jwtService.verify(token);
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(
-        `This token is invalid or expired, request a new one: ${error.message}`,
+        'This token is invalid or expired, request a new one',
       );
     }
   }

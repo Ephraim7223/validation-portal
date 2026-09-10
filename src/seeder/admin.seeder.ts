@@ -13,19 +13,25 @@ export class AdminSeeder implements Seeder {
   ) {}
 
   async seed(): Promise<any> {
+    const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@gmail.com';
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'admin';
+    const superEmail =
+      process.env.SEED_SUPER_ADMIN_EMAIL || 'supadmin@mail.com';
+    const superPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || 'SupAdmin';
+
     const newAdmin: Admin[] = [
       {
-        email: 'admin@gmail.com',
+        email: adminEmail,
         name: 'Giftgo',
         phone: '+234 703 506 1222',
-        password: await argon.hash('admin'),
+        password: await argon.hash(adminPassword),
         role: 'admin',
       },
       {
-        email: 'supadmin@mail.com',
+        email: superEmail,
         name: 'Test Admin',
         phone: '+234 701 711 1908',
-        password: await argon.hash('SupAdmin'),
+        password: await argon.hash(superPassword),
         role: 'Super-admin',
       },
     ];

@@ -17,6 +17,7 @@ import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 import { generateUserID } from 'src/functions/genrating-random-number';
 import { Admin } from 'src/auth/schema';
 import { IResponse } from 'src/interfaces/response.interface';
+import { sanitizeDocument } from 'src/common/helpers';
 
 @Injectable()
 export class UserService {
@@ -55,7 +56,7 @@ export class UserService {
       return {
         statusCode: 409,
         message: 'One or more fields already exist',
-        data: existingUser,
+        data: sanitizeDocument(existingUser),
         error: {
           code: 'FIELD_ALREADY_EXIST',
           message: 'One or more fields already exist',
@@ -168,7 +169,7 @@ export class UserService {
       response = {
         statusCode: 201,
         message: 'User saved successfully',
-        data: newUser,
+        data: sanitizeDocument(newUser),
         error: null,
       };
     }
@@ -183,7 +184,7 @@ export class UserService {
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
-        data: users,
+        data: sanitizeDocument(users),
         error: null,
       };
     } catch (error) {
@@ -219,7 +220,7 @@ export class UserService {
         statusCode: 200,
         message: 'User retrieved successfully',
         data: {
-          ...user.toObject(),
+          ...sanitizeDocument(user.toObject()),
           calculatedExpiryDate: userExpiryDate,
           hubExpiryDate: hubExpiryDate,
         },
@@ -248,7 +249,7 @@ export class UserService {
       return {
         statusCode: 200,
         message: 'User deleted successfully',
-        data: user,
+        data: sanitizeDocument(user),
         error: null,
       };
     } catch (error) {
@@ -289,7 +290,7 @@ export class UserService {
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
-        data: users,
+        data: sanitizeDocument(users),
         error: null,
       };
     } catch (error) {
@@ -304,7 +305,7 @@ export class UserService {
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
-        data: users,
+        data: sanitizeDocument(users),
         error: null,
       };
     } catch (error) {

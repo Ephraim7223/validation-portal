@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import axios from 'axios';
 
@@ -6,30 +7,40 @@ import axios from 'axios';
 export class CronJobService {
   private readonly logger = new Logger(CronJobService.name);
 
+  constructor(private readonly configService: ConfigService) {}
+
   @Cron('0 */10 * * * *')
   async handleCron() {
+    const enabled = this.configService.get<string | boolean>(
+      'KEEP_ALIVE_ENABLED',
+    );
+    if (enabled === false || enabled === 'false') {
+      return;
+    }
+
+    const url =
+      this.configService.get<string>('KEEP_ALIVE_URL') ||
+      `${this.configService.get('API_BASE_URL') || 'http://localhost:7700'}/api/v1/health`;
+
     try {
-      const URL = 'https://portal-i49b.onrender.com/api/v1/auth/sign-in';
-
-      const signInDto = {
-        email: 'supadmin@mail.com',
-        password: 'SupAdmin',
-      };
-
-      const response = await axios.post(URL, signInDto, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await axios.get(url, {
+        timeout: 15000,
+        headers: { Accept: 'application/json' },
+        validateStatus: () => true,
       });
 
-      if (response.status === 200) {
-        this.logger.log('Login successfull');
-        // this.logger.log(response.data);
+      if (response.status >= 200 && response.status < 300) {
+        this.logger.log(`Keep-alive OK (${response.status}) → ${url}`);
       } else {
-        this.logger.error(`POST request failed with status ${response.status}`);
+        this.logger.warn(
+          `Keep-alive non-success status ${response.status} → ${url}`,
+        );
       }
     } catch (error) {
-      this.logger.error('Error while sending request', error);
+      this.logger.error(
+        `Keep-alive request failed → ${url}`,
+        error instanceof Error ? error.message : undefined,
+      );
     }
   }
 }

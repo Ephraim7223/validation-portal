@@ -41,6 +41,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+# Keep .env.example and .env.test as templates (safe placeholders only)
 
 # temp directory
 .temp

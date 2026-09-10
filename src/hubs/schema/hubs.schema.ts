@@ -16,10 +16,10 @@ export class Hub {
   @Prop({ required: true, unique: true })
   phone: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   password: string;
 
-  @Prop()
+  @Prop({ select: false })
   secretToken?: string;
 
   @Prop({ required: true })
@@ -57,10 +57,10 @@ export class Hub {
 
   _id: any;
 
-  @Prop({ default: null })
+  @Prop({ default: null, select: false })
   otp?: string;
 
-  @Prop({ type: Date, default: undefined })
+  @Prop({ type: Date, default: undefined, select: false })
   otpCreatedAt?: Date;
 
   @Prop({ type: String, enum: Object.values(categoryEnum), required: true })

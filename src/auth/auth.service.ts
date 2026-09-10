@@ -20,7 +20,9 @@ export class AuthService {
   constructor(@InjectModel('Admin') private readonly userModel: Model<Admin>) {}
   async signIn(signInDto: SignInDto): Promise<IResponse> {
     try {
-      const admin = await this.userModel.findOne({ email: signInDto.email });
+      const admin = await this.userModel
+        .findOne({ email: signInDto.email })
+        .select('+password');
 
       if (!admin) {
         throw new NotFoundException(

@@ -17,32 +17,57 @@ import {
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { CreateUserDto, SuspensionDto } from './dto/create-user.dto';
+import {
+  CreateUserDto,
+  OrganisationUsersDto,
+  SearchUsersDto,
+  SuspensionDto,
+} from './dto/create-user.dto';
 import { FileValidationPipe } from 'src/file-validation/file-validation.pipe';
 import { responseFormatter } from 'src/utils/response.formatter';
 import { JwtGuard } from 'src/guards';
 import { IResponse } from 'src/interfaces';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
+@ApiTags('Users')
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('check-unique')
+  @ApiOperation({
+    summary: 'Check uniqueness of user fields',
+    description: 'Checks email, phoneNumber, and/or NIN against existing users.',
+  })
+  @ApiQuery({ name: 'email', required: false })
+  @ApiQuery({ name: 'phoneNumber', required: false })
+  @ApiQuery({ name: 'NIN', required: false })
   async checkUnique(
     @Query('email') email: string,
     @Query('phoneNumber') phoneNumber: string,
     @Query('NIN') NIN: string,
   ) {
-    const result = await this.userService.checkUniqueFields(
-      email,
-      phoneNumber,
-      NIN,
-    );
-    return result;
+    return this.userService.checkUniqueFields(email, phoneNumber, NIN);
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('register')
+  @ApiOperation({
+    summary: 'Register an applicant',
+    description: 'Public registration with required profile picture upload.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateUserDto })
+  @ApiResponse({ status: 200, description: 'User registered' })
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async register(
     @UploadedFiles(new FileValidationPipe())
@@ -51,8 +76,7 @@ export class UserController {
     },
     @Body() createUserDto: CreateUserDto,
   ) {
-    console.log('Received files:', file);
-    if (!file.profilePic) {
+    if (!file?.profilePic) {
       return {
         statusCode: 400,
         message: 'Profile pic is required',
@@ -79,100 +103,94 @@ export class UserController {
 
   @HttpCode(HttpStatus.OK)
   @Get()
+  @ApiOperation({ summary: 'List all users' })
   async getAllUsers() {
     try {
-      const result = await this.userService.getAllUsers();
-      return result;
+      return await this.userService.getAllUsers();
     } catch (error) {
-      throw new BadRequestException(error.message);
-    }
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Get(':id')
-  async getUserById(@Param('id') id: string) {
-    try {
-      const result = await this.userService.getUserById(id);
-      return result;
-    } catch (error) {
-      throw new BadRequestException(error.message);
-    }
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Delete(':id')
-  async deleteUser(@Param('id') id: string) {
-    try {
-      const result = await this.userService.deleteUser(id);
-      return result;
-    } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not retrieve users',
+      );
     }
   }
 
   @HttpCode(HttpStatus.OK)
   @Delete()
+  @ApiOperation({
+    summary: 'Delete all users',
+    description: 'Destructive operation — removes every user document.',
+  })
   async deleteAllUsers() {
     try {
-      const result = await this.userService.deleteAllUsers();
-      return result;
+      return await this.userService.deleteAllUsers();
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not delete users',
+      );
     }
   }
 
   @HttpCode(HttpStatus.OK)
   @Get('hub/:hubId')
+  @ApiOperation({ summary: 'List users belonging to a hub' })
+  @ApiParam({ name: 'hubId' })
   async getUsersByHub(@Param('hubId') hubId: string) {
     try {
-      const result = await this.userService.getUsersByHub(hubId);
-      return result;
+      return await this.userService.getUsersByHub(hubId);
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not retrieve users',
+      );
     }
   }
 
   @HttpCode(HttpStatus.OK)
   @Get('role/:role')
+  @ApiOperation({ summary: 'List users by role' })
+  @ApiParam({ name: 'role', example: 'intern' })
   async getUsersByRole(@Param('role') role: string) {
     try {
-      const result = await this.userService.getUsersByRole(role);
-      return result;
+      return await this.userService.getUsersByRole(role);
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not retrieve users',
+      );
     }
   }
 
   @Patch('suspend/:id')
+  @ApiOperation({ summary: 'Suspend a user' })
+  @ApiParam({ name: 'id' })
   async requestSuspension(
     @Param('id') id: string,
     @Body() suspensionDto: SuspensionDto,
   ): Promise<any> {
-    try {
-      const result = await this.userService.suspendUser(id, suspensionDto);
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    return this.userService.suspendUser(id, suspensionDto);
   }
 
   @Patch('unsuspend/:id')
+  @ApiOperation({ summary: 'Unsuspend a user' })
+  @ApiParam({ name: 'id' })
   async unSuspendUser(@Param('id') id: string) {
     return await this.userService.unSuspendUser(id);
   }
 
   @Get('stacks/count')
+  @ApiOperation({ summary: 'Count users per stack (global)' })
   async getStacksCount() {
     return await this.userService.getStacksCount();
   }
 
   @Get('users/count-by-role-and-month')
+  @ApiOperation({ summary: 'Aggregate user counts by role and month' })
   async getUsersCountByRoleAndMonth() {
     return await this.userService.getUsersCountByRoleAndMonth();
   }
 
   @Post('search')
-  async search(@Body() body: { query: string }) {
+  @ApiOperation({ summary: 'Search users by free-text query' })
+  @ApiBody({ type: SearchUsersDto })
+  async search(@Body() body: SearchUsersDto) {
     const { query } = body;
     if (!query || query.trim() === '') {
       throw new BadRequestException('Search query is required');
@@ -181,7 +199,9 @@ export class UserController {
   }
 
   @Post('getUsersByOrganisation')
-  async getUsersByOrganisation(@Body() body: { organisation: string }) {
+  @ApiOperation({ summary: 'List users by organisation name' })
+  @ApiBody({ type: OrganisationUsersDto })
+  async getUsersByOrganisation(@Body() body: OrganisationUsersDto) {
     const { organisation } = body;
     if (!organisation || organisation.trim() === '') {
       throw new BadRequestException('Organisation field is required');
@@ -192,8 +212,42 @@ export class UserController {
 
   @Post('admin/me')
   @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Get authenticated admin profile',
+    description: 'Returns admin details and managed hubs (sensitive fields excluded).',
+  })
   async getMe(@Req() req): Promise<IResponse> {
     const adminId = req.user._id;
     return this.userService.getMe(adminId);
+  }
+
+  // Parametric routes last
+  @HttpCode(HttpStatus.OK)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a user by id' })
+  @ApiParam({ name: 'id' })
+  async getUserById(@Param('id') id: string) {
+    try {
+      return await this.userService.getUserById(id);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not retrieve user',
+      );
+    }
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a user by id' })
+  @ApiParam({ name: 'id' })
+  async deleteUser(@Param('id') id: string) {
+    try {
+      return await this.userService.deleteUser(id);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not delete user',
+      );
+    }
   }
 }

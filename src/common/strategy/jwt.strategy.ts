@@ -16,7 +16,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get('JWT_ACCESS_SECRET'),
+      secretOrKey: config.getOrThrow('JWT_ACCESS_SECRET'),
     });
   }
 
@@ -24,16 +24,23 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     let user;
 
     if (payload.role === 'admin' || payload.role === 'Super-admin') {
-      user = await this.adminModel.findById({ _id: payload.sub }).exec();
+      user = await this.adminModel
+        .findById(payload.sub)
+        .select('-password -secretToken')
+        .lean()
+        .exec();
     } else if (payload.role === 'hub') {
-      user = await this.hubModel.findById({ _id: payload.sub }).exec();
+      user = await this.hubModel
+        .findById(payload.sub)
+        .select('-password -otp -otpCreatedAt -secretToken')
+        .lean()
+        .exec();
     }
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    delete user.password; // Remove sensitive data
     return user;
   }
 }

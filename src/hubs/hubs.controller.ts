@@ -19,6 +19,7 @@ import {
   UsePipes,
   ValidationPipe,
   Query,
+  Logger,
 } from '@nestjs/common';
 import { HubService } from './hubs.service';
 import {
@@ -37,36 +38,55 @@ import {
 import { JwtGuard } from 'src/guards';
 import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
 import { IResponse } from 'src/interfaces';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
+@ApiTags('Hubs')
 @Controller('hubs')
 export class HubsController {
-  logger: any;
+  private readonly logger = new Logger(HubsController.name);
+
   constructor(private readonly hubsService: HubService) {}
 
   @Get('check-unique')
+  @ApiOperation({
+    summary: 'Check uniqueness of applicant fields (via hubs namespace)',
+    description:
+      'Checks whether email, phoneNumber, and/or NIN already exist on a user record. Returns 409-shaped payload when a conflict is found.',
+  })
+  @ApiQuery({ name: 'email', required: false })
+  @ApiQuery({ name: 'phoneNumber', required: false })
+  @ApiQuery({ name: 'NIN', required: false })
+  @ApiResponse({ status: 200, description: 'Fields are unique' })
+  @ApiResponse({ status: 409, description: 'One or more fields already exist' })
   async checkUnique(
     @Query('email') email: string,
     @Query('phoneNumber') phoneNumber: string,
     @Query('NIN') NIN: string,
   ) {
-    const result = await this.hubsService.checkUniqueFields(
-      email,
-      phoneNumber,
-      NIN,
-    );
-    return result;
-  }
-
-  @Get('check-unique')
-  async checkUniques(
-    @Query('email') email: string,
-    @Query('phone') phone: string,
-  ) {
-    const result = await this.hubsService.checkUniqueField(email, phone);
-    return result;
+    return this.hubsService.checkUniqueFields(email, phoneNumber, NIN);
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('register')
+  @ApiOperation({
+    summary: 'Register a new hub',
+    description:
+      'Creates a hub application with CAC and logo uploads. Password is hashed at rest and never returned in responses.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateHubDto })
+  @ApiResponse({ status: 201, description: 'Hub created successfully' })
+  @ApiResponse({ status: 400, description: 'Missing files or validation error' })
+  @ApiResponse({ status: 409, description: 'Hub email/phone already exists' })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'CAC', maxCount: 1 },
@@ -81,8 +101,7 @@ export class HubsController {
     },
     @Body() createHubDto: CreateHubDto,
   ) {
-    console.log('Received files:', file);
-    if (!file.CAC && !file.logo) {
+    if (!file?.CAC && !file?.logo) {
       return {
         statusCode: 400,
         message: 'CAC and Logo fields are required',
@@ -109,7 +128,14 @@ export class HubsController {
 
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT')
   @Post('register-user')
+  @ApiOperation({
+    summary: 'Register a user under the authenticated hub',
+    description: 'Requires a hub JWT. Uploads a profile picture and creates the applicant under the hub.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: ApproveUserDto })
   @UseInterceptors(FileFieldsInterceptor([{ name: 'profilePic', maxCount: 1 }]))
   async addUser(
     @UploadedFiles(new FileValidationPipe())
@@ -118,7 +144,7 @@ export class HubsController {
     @Req() req,
   ) {
     const hubId = req.user._id;
-    if (!file.profilePic) {
+    if (!file?.profilePic) {
       return {
         statusCode: 400,
         message: 'Profile pic is required',
@@ -145,44 +171,48 @@ export class HubsController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
+  @ApiOperation({
+    summary: 'Hub login',
+    description:
+      'Authenticates with hubId + password. Returns JWT and hub profile (without password/OTP).',
+  })
+  @ApiBody({ type: SignInDto })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials / suspended / unverified' })
   async login(@Body() signInDto: SignInDto) {
     return this.hubsService.login(signInDto);
   }
 
   @HttpCode(HttpStatus.OK)
-  // @AllowedRoles(Role.superAdmin)
-  // @UseGuards(new JwtGuard(['Super-admin']), RolesGuard)
   @Get()
+  @ApiOperation({
+    summary: 'List all hubs',
+    description: 'Returns all hubs with nested users. Sensitive fields are excluded.',
+  })
   async getAllHubs() {
     return this.hubsService.getAllHubs();
   }
 
   @HttpCode(HttpStatus.OK)
   @Patch('verify/:id')
+  @ApiOperation({ summary: 'Verify a hub account' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async verifyHub(@Param('id') id: string) {
     try {
-      const result = await this.hubsService.verifyHub(id);
-      return result;
+      return await this.hubsService.verifyHub(id);
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not verify hub',
+      );
     }
   }
 
-  @Get(':id')
-  async getSingleHub(@Param('id') id: string) {
-    return this.hubsService.getSingleHub(id);
-  }
-
-  @Delete(':id')
-  async deleteHub(@Param('id') id: string) {
-    return this.hubsService.deleteHub(id);
-  }
-
   @Patch('suspend/:id')
+  @ApiOperation({ summary: 'Suspend a hub' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async suspendHub(@Param('id') id: string) {
     try {
-      const result = await this.hubsService.suspendHub(id);
-      return result;
+      return await this.hubsService.suspendHub(id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new NotFoundException('Hub not found');
@@ -195,10 +225,11 @@ export class HubsController {
   }
 
   @Patch('unsuspend/:id')
+  @ApiOperation({ summary: 'Unsuspend a hub' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async unsuspendHub(@Param('id') id: string) {
     try {
-      const result = await this.hubsService.unsuspendHub(id);
-      return result;
+      return await this.hubsService.unsuspendHub(id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new NotFoundException('Hub not found');
@@ -211,21 +242,29 @@ export class HubsController {
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Get('users/users')
+  @ApiOperation({ summary: 'List users under the authenticated hub' })
   async getUsersUnderHub(@Req() req) {
     const hubId = req.user._id;
     return this.hubsService.getUsersUnderHub(hubId);
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Get('users/users/:userId')
+  @ApiOperation({ summary: 'Get a single user under the authenticated hub' })
+  @ApiParam({ name: 'userId' })
   async getSingleUser(@Req() req, @Param('userId') userId: string) {
     const hubId = req.user._id;
     return this.hubsService.getSingleUser(hubId, userId);
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Put('approve/:userId')
+  @ApiOperation({ summary: 'Approve a user application' })
+  @ApiParam({ name: 'userId' })
   @UsePipes(new ValidationPipe({ transform: true }))
   async approveUser(
     @Param('userId') userId: string,
@@ -233,16 +272,18 @@ export class HubsController {
     @Body() approveApplicationDto: ApproveApplicationDto,
   ) {
     const hubId = req.user._id;
-    const response = await this.hubsService.approveUser(
+    return this.hubsService.approveUser(
       approveApplicationDto,
       userId,
       hubId,
     );
-    return response;
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Post('users/schedule/:id')
+  @ApiOperation({ summary: 'Schedule an interview for a user' })
+  @ApiParam({ name: 'id', description: 'User MongoDB ObjectId' })
   async scheduleInterview(
     @Req() req,
     @Param('id') id: string,
@@ -262,48 +303,64 @@ export class HubsController {
         error: result.error,
       };
     } catch (error) {
-      this.logger.error(`Error scheduling interview: ${error.message}`);
+      this.logger.error(
+        `Error scheduling interview: ${error instanceof Error ? error.message : error}`,
+      );
       throw new BadRequestException('Could not schedule interview');
     }
   }
 
   @UseGuards(JwtGuard)
-  // @Get('users/pending-interview')
+  @ApiBearerAuth('JWT')
   @Get('users/pending-interview')
+  @ApiOperation({ summary: 'List users pending interview for the hub' })
   async getUsersPendingInterview(@Req() req) {
     const hubId = req.user._id;
     return this.hubsService.getUsersPendingInterview(hubId);
   }
 
   @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT')
   @Get('users/role/:role')
+  @ApiOperation({ summary: 'List hub users filtered by role' })
+  @ApiParam({ name: 'role', example: 'intern' })
   async getUsersByRole(@Param('role') role: string, @Req() req) {
     const hubId = req.user._id;
     return this.hubsService.getUsersByRole(role, hubId);
   }
 
   @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT')
   @Get('stacks/count')
+  @ApiOperation({ summary: 'Count users per stack for the authenticated hub' })
   async getStacksCount(@Req() req) {
     const hubId = req.user._id;
     return this.hubsService.getStacksCount(hubId);
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Get('users/pending-users')
+  @ApiOperation({ summary: 'List pending (unapproved) users for the hub' })
   async getPendingUsers(@Req() req) {
     const hubId = req.user._id;
     return await this.hubsService.getPendingUsers(hubId);
   }
 
   @UseGuards(new JwtGuard(['hub']))
+  @ApiBearerAuth('JWT')
   @Get('users/users-count-by-role-and-month')
+  @ApiOperation({
+    summary: 'Aggregate hub user counts by role and month',
+  })
   async getUsersCountByRoleAndMonth(@Req() req) {
     const hubId = req.user._id;
     return await this.hubsService.getUsersCountByRoleAndMonth(hubId);
   }
 
   @Patch('payment/:id')
+  @ApiOperation({ summary: 'Update hub paid / subscription status' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async updatePaidStatus(
     @Param('id') id: string,
     @Body() updatePaidStatusDto: UpdatePaidStatusDto,
@@ -312,6 +369,10 @@ export class HubsController {
   }
 
   @Patch('forgot-password')
+  @ApiOperation({
+    summary: 'Request password reset OTP',
+    description: 'Sends a 6-digit OTP to the hub email if the account exists.',
+  })
   async forgotPassword(
     @Body() forgotPasswordDto: ForgotPasswordDto,
   ): Promise<IResponse> {
@@ -319,14 +380,35 @@ export class HubsController {
   }
 
   @Patch('reset-password')
+  @ApiOperation({ summary: 'Reset hub password with OTP' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.hubsService.resetPassword(resetPasswordDto);
   }
 
   @Post('me')
   @UseGuards(JwtGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Get authenticated hub profile',
+    description: 'Returns hub details and related users (sensitive fields excluded).',
+  })
   async getMe(@Req() req): Promise<IResponse> {
     const hubId = req.user._id;
     return this.hubsService.getMe(hubId);
+  }
+
+  // Parametric routes last so they do not shadow static paths above
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single hub by id' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
+  async getSingleHub(@Param('id') id: string) {
+    return this.hubsService.getSingleHub(id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a hub by id' })
+  @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
+  async deleteHub(@Param('id') id: string) {
+    return this.hubsService.deleteHub(id);
   }
 }

@@ -1,22 +1,20 @@
-import * as dotenv from 'dotenv';
-dotenv.config();
-
 import { createTransport } from 'nodemailer';
 import { google } from 'googleapis';
 import { Logger } from '@nestjs/common';
+
 const OAuth2 = google.auth.OAuth2;
 const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, REFRESH_TOKEN, GMAIL_NAME } =
   process.env;
 
-console.log({
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDIRECT_URI,
-  REFRESH_TOKEN,
-  GMAIL_NAME,
-});
+const logger = new Logger('GoogleMailConfig');
 
-const logger = new Logger(`GoogleMailConfig`);
+if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !GMAIL_NAME) {
+  logger.warn(
+    'Gmail OAuth env vars are incomplete — outbound mail may fail until they are set.',
+  );
+} else {
+  logger.log(`Gmail OAuth configured for sender: ${GMAIL_NAME}`);
+}
 
 const oauth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 oauth2Client.setCredentials({
@@ -35,7 +33,7 @@ const smtpTransport = createTransport({
     accessToken: accessToken,
   },
   tls: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: true,
   },
 });
 

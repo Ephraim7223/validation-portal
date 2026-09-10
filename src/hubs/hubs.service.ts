@@ -39,6 +39,8 @@ import { SubscriptionExpiryMail } from 'src/templates/expiredSuscriptionMail';
 import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
 import { IResponse } from 'src/interfaces';
 import { PasswordResetMail } from 'src/templates/password.reset.mail';
+import { sanitizeDocument } from 'src/common/helpers';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class HubService {
@@ -55,7 +57,7 @@ export class HubService {
   ) {}
 
   private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 1000000).toString();
   }
 
   private getPublicIdFromUrl(imageUrl: string): string {
@@ -77,7 +79,7 @@ export class HubService {
       return {
         statusCode: 409,
         message: 'One or more fields already exist',
-        data: existingUser,
+        data: sanitizeDocument(existingUser),
         error: {
           code: 'FIELD_ALREADY_EXIST',
           message: 'One or more fields already exist',
@@ -104,7 +106,7 @@ export class HubService {
       return {
         statusCode: 409,
         message: 'One or more fields already exist',
-        data: existingUser,
+        data: sanitizeDocument(existingUser),
         error: {
           code: 'FIELD_ALREADY_EXIST',
           message: 'One or more fields already exist',
@@ -142,7 +144,9 @@ export class HubService {
       throw new BadRequestException('Email is required');
     }
 
-    const user = await this.hubModel.findOne({ email });
+    const user = await this.hubModel
+      .findOne({ email })
+      .select('+otp +otpCreatedAt');
 
     if (!user) {
       throw new NotFoundException(`User with email ${email} not found`);
@@ -157,14 +161,14 @@ export class HubService {
 
     setTimeout(
       async () => {
-        const userToUpdate = await this.hubModel.findOne({ email });
+        const userToUpdate = await this.hubModel
+          .findOne({ email })
+          .select('+otp +otpCreatedAt');
         if (userToUpdate && userToUpdate.otp === otp) {
           userToUpdate.otp = undefined;
           userToUpdate.otpCreatedAt = undefined;
           await userToUpdate.save();
-          this.logger.log(
-            `Expired OTP for user ${email} cleared from database`,
-          );
+          this.logger.log(`Expired OTP cleared from database`);
         }
       },
       timeoutMinutes * 60 * 1000,
@@ -188,7 +192,9 @@ export class HubService {
       );
     }
 
-    const user = await this.hubModel.findOne({ otp });
+    const user = await this.hubModel
+      .findOne({ otp })
+      .select('+otp +otpCreatedAt +password');
 
     if (!user || user.otp !== otp || !user.otpCreatedAt) {
       throw new UnauthorizedException('Invalid OTP');
@@ -273,12 +279,14 @@ export class HubService {
       response = {
         statusCode: 201,
         message: 'hub created successfully',
-        data: newHub,
+        data: sanitizeDocument(newHub),
         error: null,
       };
     }
 
-    this.logger.log(response);
+    this.logger.log(
+      `Hub register response status=${response?.statusCode} message=${response?.message}`,
+    );
     return response;
   }
 
@@ -410,7 +418,7 @@ export class HubService {
       return {
         statusCode: 201,
         message: 'User saved successfully',
-        data: newUser,
+        data: sanitizeDocument(newUser),
         error: null,
       };
     } catch (error) {
@@ -419,14 +427,19 @@ export class HubService {
         statusCode: 500,
         message: 'Internal server error',
         data: null,
-        error,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+        },
       };
     }
   }
 
   async login(signInDto: SignInDto) {
     try {
-      const hub = await this.hubModel.findOne({ hubId: signInDto.hubId });
+      const hub = await this.hubModel
+        .findOne({ hubId: signInDto.hubId })
+        .select('+password');
       if (!hub) {
         throw new UnauthorizedException('Invalid hubId');
       }
@@ -449,7 +462,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Login successful',
-        data: { token, hub: hub },
+        data: { token, hub: sanitizeDocument(hub) },
         error: null,
       };
     } catch (error) {
@@ -464,7 +477,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Hubs retrieved successfully',
-        data: hubs,
+        data: sanitizeDocument(hubs),
         error: null,
       };
     } catch (error) {
@@ -500,7 +513,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Hub verification successful',
-        data: updatedHub,
+        data: sanitizeDocument(updatedHub),
         error: null,
       };
     } catch (error) {
@@ -527,7 +540,7 @@ export class HubService {
         statusCode: 200,
         message: 'Hub retrieved successfully',
         data: {
-          ...hub.toObject(),
+          ...sanitizeDocument(hub.toObject()),
           expiryDate: expiryDate,
         },
         error: null,
@@ -577,7 +590,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Hub suspended successfully',
-        data: hubToSuspend,
+        data: sanitizeDocument(hubToSuspend),
         error: null,
       };
     } catch (error) {
@@ -607,7 +620,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Hub unsuspended successfully',
-        data: hubToUnsuspend,
+        data: sanitizeDocument(hubToUnsuspend),
         error: null,
       };
     } catch (error) {
@@ -786,7 +799,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Interview scheduled successfully',
-        data: user,
+        data: sanitizeDocument(user),
         error: null,
       };
     } catch (error) {
@@ -817,7 +830,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Users pending interview retrieved successfully',
-        data: usersPendingInterview,
+        data: sanitizeDocument(usersPendingInterview),
         error: null,
       };
     } catch (error) {
@@ -846,7 +859,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
-        data: usersUnderHub,
+        data: sanitizeDocument(usersUnderHub),
         error: null,
       };
     } catch (error) {
@@ -873,7 +886,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'User retrieved successfully',
-        data: user,
+        data: sanitizeDocument(user),
         error: null,
       };
     } catch (error) {
@@ -892,7 +905,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
-        data: users,
+        data: sanitizeDocument(users),
         error: null,
       };
     } catch (error) {
@@ -979,7 +992,7 @@ export class HubService {
       return {
         statusCode: 200,
         message: 'User counts by role and month retrieved successfully',
-        data: userCountsByRoleAndMonth,
+        data: sanitizeDocument(userCountsByRoleAndMonth),
         error: null,
       };
     } catch (error) {
@@ -1010,7 +1023,7 @@ export class HubService {
     return {
       statusCode: 200,
       message: 'Hub payment status updated successfully',
-      data: hub,
+      data: sanitizeDocument(hub),
       error: null,
     };
   }
