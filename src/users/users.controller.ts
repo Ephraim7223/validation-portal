@@ -50,13 +50,23 @@ export class UserController {
   })
   @ApiQuery({ name: 'email', required: false })
   @ApiQuery({ name: 'phoneNumber', required: false })
+  @ApiQuery({
+    name: 'phone',
+    required: false,
+    description: 'Alias for phoneNumber',
+  })
   @ApiQuery({ name: 'NIN', required: false })
   async checkUnique(
     @Query('email') email: string,
     @Query('phoneNumber') phoneNumber: string,
+    @Query('phone') phone: string,
     @Query('NIN') NIN: string,
   ) {
-    return this.userService.checkUniqueFields(email, phoneNumber, NIN);
+    return this.userService.checkUniqueFields(
+      email,
+      phoneNumber || phone,
+      NIN,
+    );
   }
 
   @HttpCode(HttpStatus.OK)

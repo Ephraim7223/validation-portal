@@ -41,6 +41,13 @@ import { IResponse } from 'src/interfaces';
 import { PasswordResetMail } from 'src/templates/password.reset.mail';
 import { sanitizeDocument } from 'src/common/helpers';
 import { randomInt } from 'crypto';
+import {
+  digitsOnly,
+  emailsMatch,
+  isValidPhoneInput,
+  phoneMatchVariants,
+  phoneMatchesStored,
+} from 'src/utils/phone.util';
 
 @Injectable()
 export class HubService {
@@ -68,21 +75,62 @@ export class HubService {
   }
 
   async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
-    const query: any = {};
-    if (email) query.email = email;
-    if (phoneNumber) query.phoneNumber = phoneNumber;
-    if (NIN) query.NIN = NIN;
+    // User uniqueness (used by hub register-user / applicant flows)
+    const or: Record<string, unknown>[] = [];
+    if (email?.trim()) {
+      or.push({ email: email.trim().toLowerCase() });
+      or.push({ email: email.trim() });
+    }
+    if (phoneNumber) {
+      const variants = phoneMatchVariants(phoneNumber);
+      if (variants.length) or.push({ phoneNumber: { $in: variants } });
+    }
+    if (NIN) {
+      const ninDigits = digitsOnly(NIN);
+      if (ninDigits) {
+        or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
+      }
+    }
 
-    const existingUser = await this.userModel.findOne(query);
+    if (!or.length) {
+      return {
+        statusCode: 400,
+        message: 'Provide at least one of email, phoneNumber, or NIN',
+        data: null,
+        error: {
+          code: 'MISSING_QUERY',
+          message: 'Provide at least one of email, phoneNumber, or NIN',
+        },
+      };
+    }
+
+    const existingUser = await this.userModel.findOne({ $or: or });
 
     if (existingUser) {
+      const conflicts: string[] = [];
+      if (email && emailsMatch(email, existingUser.email)) conflicts.push('email');
+      if (
+        phoneNumber &&
+        phoneMatchesStored(phoneNumber, existingUser.phoneNumber)
+      ) {
+        conflicts.push('phoneNumber');
+      }
+      if (NIN && digitsOnly(NIN) === digitsOnly(existingUser.NIN)) {
+        conflicts.push('NIN');
+      }
+
+      const message =
+        conflicts.length === 1
+          ? `${conflicts[0] === 'phoneNumber' ? 'Phone number' : conflicts[0]} already exists`
+          : 'One or more fields already exist';
+
       return {
         statusCode: 409,
-        message: 'One or more fields already exist',
-        data: sanitizeDocument(existingUser),
+        message,
+        data: { conflicts },
         error: {
           code: 'FIELD_ALREADY_EXIST',
-          message: 'One or more fields already exist',
+          message,
         },
       };
     }
@@ -96,20 +144,75 @@ export class HubService {
   }
 
   async checkUniqueField(email?: string, phone?: string) {
-    const query: any = {};
-    if (email) query.email = email;
-    if (phone) query.phone = phone;
+    const or: Record<string, unknown>[] = [];
 
-    const existingUser = await this.hubModel.findOne(query);
+    if (email?.trim()) {
+      const normalizedEmail = email.trim();
+      or.push({ email: normalizedEmail });
+      or.push({ email: normalizedEmail.toLowerCase() });
+    }
 
-    if (existingUser) {
+    if (phone) {
+      if (!isValidPhoneInput(phone)) {
+        return {
+          statusCode: 400,
+          message: 'Invalid phone number format',
+          data: null,
+          error: {
+            code: 'INVALID_PHONE',
+            message: 'Invalid phone number format',
+          },
+        };
+      }
+      const variants = phoneMatchVariants(phone);
+      if (variants.length) {
+        or.push({ phone: { $in: variants } });
+      }
+    }
+
+    if (!or.length) {
+      return {
+        statusCode: 400,
+        message: 'Provide at least one of email or phone',
+        data: null,
+        error: {
+          code: 'MISSING_QUERY',
+          message: 'Provide at least one of email or phone',
+        },
+      };
+    }
+
+    const existingHub = await this.hubModel.findOne({ $or: or });
+
+    if (existingHub) {
+      const emailTaken = !!(email && emailsMatch(email, existingHub.email));
+      const phoneTaken = !!(
+        phone && phoneMatchesStored(phone, existingHub.phone)
+      );
+      const conflicts: string[] = [];
+      if (emailTaken) conflicts.push('email');
+      if (phoneTaken) conflicts.push('phone');
+
+      // If $or matched but field compare failed (casing / legacy), still report accurately
+      if (!conflicts.length) {
+        if (email) conflicts.push('email');
+        else if (phone) conflicts.push('phone');
+      }
+
+      const message =
+        conflicts.length === 1 && conflicts[0] === 'phone'
+          ? 'Phone number already exists, please use a different number'
+          : conflicts.length === 1 && conflicts[0] === 'email'
+            ? 'Email already exists, please use a different email'
+            : 'Hub with existing email or phone already exists';
+
       return {
         statusCode: 409,
-        message: 'One or more fields already exist',
-        data: sanitizeDocument(existingUser),
+        message,
+        data: { conflicts },
         error: {
           code: 'FIELD_ALREADY_EXIST',
-          message: 'One or more fields already exist',
+          message,
         },
       };
     }
@@ -230,24 +333,53 @@ export class HubService {
     let response: any;
     const { email, hubName, phone } = createHubDto;
 
-    const phoneNumberAsNumber = parseInt(phone);
-    if (isNaN(phoneNumberAsNumber)) {
-      return { message: 'Invalid phone number format' };
+    if (!isValidPhoneInput(phone)) {
+      return {
+        statusCode: 400,
+        message: 'Invalid phone number format',
+        data: null,
+        error: {
+          code: 'INVALID_PHONE',
+          message: 'Invalid phone number format',
+        },
+      };
     }
 
-    this.logger.log('Looking for a hub with an existing email');
+    const phoneVariants = phoneMatchVariants(phone);
+    const normalizedEmail = email?.trim();
+
+    this.logger.log('Looking for a hub with an existing email or phone');
     const existingHub = await this.hubModel.findOne({
-      $or: [{ email }, { phone }],
+      $or: [
+        { email: normalizedEmail },
+        { email: normalizedEmail?.toLowerCase() },
+        { phone: { $in: phoneVariants } },
+      ],
     });
 
     if (existingHub) {
+      const emailTaken = emailsMatch(normalizedEmail, existingHub.email);
+      const phoneTaken = phoneMatchesStored(phone, existingHub.phone);
+
+      const message =
+        emailTaken && !phoneTaken
+          ? 'Email already exists, please use a different email'
+          : phoneTaken && !emailTaken
+            ? 'Phone number already exists, please use a different number'
+            : 'Hub with existing email or phone already exists';
+
       response = {
         statusCode: 409,
-        message: 'Hub with existing email or phonealready exists',
-        data: null,
+        message,
+        data: {
+          conflicts: [
+            ...(emailTaken ? ['email'] : []),
+            ...(phoneTaken ? ['phone'] : []),
+          ],
+        },
         error: {
           code: 'HUB_ALREADY_EXIST',
-          message: 'Hub with existing email or phone already exists',
+          message,
         },
       };
     } else {
@@ -264,10 +396,14 @@ export class HubService {
       const hashedPassword = await argon.hash(createHubDto.password);
 
       const hubId = generateHubID(hubName);
+      // Store as digit string for consistent uniqueness (legacy rows may be numbers)
+      const phoneToStore = digitsOnly(phone);
+
       const newHub = await this.hubModel.create({
         ...createHubDto,
+        email: normalizedEmail,
         hubId,
-        phone: phoneNumberAsNumber,
+        phone: phoneToStore,
         password: hashedPassword,
         CAC: CAC.secure_url,
         logo: logo.secure_url,
@@ -335,20 +471,42 @@ export class HubService {
       const existingUser = await this.userModel.findOne({
         $or: [
           { email },
-          { phoneNumber: phoneNumberAsNumber },
+          { email: email?.trim()?.toLowerCase() },
+          { phoneNumber: { $in: phoneMatchVariants(phoneNumber) } },
           { NIN: ninAsNumber },
+          { NIN: digitsOnly(NIN) },
         ],
       });
       if (existingUser) {
+        const emailTaken = emailsMatch(email, existingUser.email);
+        const phoneTaken = phoneMatchesStored(
+          phoneNumber,
+          existingUser.phoneNumber,
+        );
+        const ninTaken = digitsOnly(NIN) === digitsOnly(existingUser.NIN);
+
+        const message =
+          [emailTaken, phoneTaken, ninTaken].filter(Boolean).length === 1
+            ? emailTaken
+              ? 'Email already exists, please use a different email'
+              : phoneTaken
+                ? 'Phone number already exists, please use a different number'
+                : 'NIN already exists, please use a different NIN'
+            : 'User with existing email, phone number, or NIN already exists';
+
         return {
           statusCode: 409,
-          message:
-            'User with existing email, phone number, or NIN already exists',
-          data: null,
+          message,
+          data: {
+            conflicts: [
+              ...(emailTaken ? ['email'] : []),
+              ...(phoneTaken ? ['phoneNumber'] : []),
+              ...(ninTaken ? ['NIN'] : []),
+            ],
+          },
           error: {
             code: 'USER_ALREADY_EXIST',
-            message:
-              'User with existing email, phone number, or NIN already exists',
+            message,
           },
         };
       }
@@ -376,7 +534,7 @@ export class HubService {
         ...createUserDto,
         hub: hubId,
         NIN: ninAsNumber,
-        phoneNumber: phoneNumberAsNumber,
+        phoneNumber: digitsOnly(phoneNumber) || phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
         age,
         isPaid: true,

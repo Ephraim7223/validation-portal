@@ -58,21 +58,25 @@ export class HubsController {
 
   @Get('check-unique')
   @ApiOperation({
-    summary: 'Check uniqueness of applicant fields (via hubs namespace)',
+    summary: 'Check uniqueness of hub email / phone',
     description:
-      'Checks whether email, phoneNumber, and/or NIN already exist on a user record. Returns 409-shaped payload when a conflict is found.',
+      'Checks whether a hub email and/or phone already exist. Accepts `phone` or `phoneNumber` query params. At least one field is required.',
   })
   @ApiQuery({ name: 'email', required: false })
-  @ApiQuery({ name: 'phoneNumber', required: false })
-  @ApiQuery({ name: 'NIN', required: false })
+  @ApiQuery({ name: 'phone', required: false, description: 'Hub phone number' })
+  @ApiQuery({
+    name: 'phoneNumber',
+    required: false,
+    description: 'Alias for phone (frontend compatibility)',
+  })
   @ApiResponse({ status: 200, description: 'Fields are unique' })
-  @ApiResponse({ status: 409, description: 'One or more fields already exist' })
+  @ApiResponse({ status: 409, description: 'Email and/or phone already exist' })
   async checkUnique(
     @Query('email') email: string,
+    @Query('phone') phone: string,
     @Query('phoneNumber') phoneNumber: string,
-    @Query('NIN') NIN: string,
   ) {
-    return this.hubsService.checkUniqueFields(email, phoneNumber, NIN);
+    return this.hubsService.checkUniqueField(email, phone || phoneNumber);
   }
 
   @HttpCode(HttpStatus.OK)

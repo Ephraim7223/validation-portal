@@ -18,6 +18,13 @@ import { generateUserID } from 'src/functions/genrating-random-number';
 import { Admin } from 'src/auth/schema';
 import { IResponse } from 'src/interfaces/response.interface';
 import { sanitizeDocument } from 'src/common/helpers';
+import {
+  digitsOnly,
+  emailsMatch,
+  isValidPhoneInput,
+  phoneMatchVariants,
+  phoneMatchesStored,
+} from 'src/utils/phone.util';
 
 @Injectable()
 export class UserService {
@@ -45,21 +52,82 @@ export class UserService {
   }
 
   async checkUniqueFields(email?: string, phoneNumber?: string, NIN?: string) {
-    const query: any = {};
-    if (email) query.email = email;
-    if (phoneNumber) query.phoneNumber = phoneNumber;
-    if (NIN) query.NIN = NIN;
+    const or: Record<string, unknown>[] = [];
 
-    const existingUser = await this.userModel.findOne(query);
+    if (email?.trim()) {
+      or.push({ email: email.trim() }, { email: email.trim().toLowerCase() });
+    }
+    if (phoneNumber) {
+      if (!isValidPhoneInput(phoneNumber)) {
+        return {
+          statusCode: 400,
+          message: 'Invalid phone number format',
+          data: null,
+          error: {
+            code: 'INVALID_PHONE',
+            message: 'Invalid phone number format',
+          },
+        };
+      }
+      const variants = phoneMatchVariants(phoneNumber);
+      if (variants.length) or.push({ phoneNumber: { $in: variants } });
+    }
+    if (NIN) {
+      const ninDigits = digitsOnly(NIN);
+      if (ninDigits) {
+        or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
+      }
+    }
+
+    if (!or.length) {
+      return {
+        statusCode: 400,
+        message: 'Provide at least one of email, phoneNumber, or NIN',
+        data: null,
+        error: {
+          code: 'MISSING_QUERY',
+          message: 'Provide at least one of email, phoneNumber, or NIN',
+        },
+      };
+    }
+
+    const existingUser = await this.userModel.findOne({ $or: or });
 
     if (existingUser) {
+      const conflicts: string[] = [];
+      if (email && emailsMatch(email, existingUser.email)) conflicts.push('email');
+      if (
+        phoneNumber &&
+        phoneMatchesStored(phoneNumber, existingUser.phoneNumber)
+      ) {
+        conflicts.push('phoneNumber');
+      }
+      if (NIN && digitsOnly(NIN) === digitsOnly(existingUser.NIN)) {
+        conflicts.push('NIN');
+      }
+
+      if (!conflicts.length) {
+        if (email) conflicts.push('email');
+        else if (phoneNumber) conflicts.push('phoneNumber');
+        else if (NIN) conflicts.push('NIN');
+      }
+
+      const message =
+        conflicts.length === 1 && conflicts[0] === 'phoneNumber'
+          ? 'Phone number already exists, please use a different number'
+          : conflicts.length === 1 && conflicts[0] === 'email'
+            ? 'Email already exists, please use a different email'
+            : conflicts.length === 1 && conflicts[0] === 'NIN'
+              ? 'NIN already exists, please use a different NIN'
+              : 'One or more fields already exist';
+
       return {
         statusCode: 409,
-        message: 'One or more fields already exist',
-        data: sanitizeDocument(existingUser),
+        message,
+        data: { conflicts },
         error: {
           code: 'FIELD_ALREADY_EXIST',
-          message: 'One or more fields already exist',
+          message,
         },
       };
     }
@@ -99,23 +167,46 @@ export class UserService {
     }
 
     this.logger.log('Looking for a user with an existing email');
+    const phoneVariants = phoneMatchVariants(phoneNumber);
     const existingUser = await this.userModel.findOne({
       $or: [
         { email },
-        { phoneNumber: phoneNumberAsNumber },
+        { email: email?.trim()?.toLowerCase() },
+        { phoneNumber: { $in: phoneVariants } },
         { NIN: ninAsNumber },
+        { NIN: digitsOnly(NIN) },
       ],
     });
     if (existingUser) {
+      const emailTaken = emailsMatch(email, existingUser.email);
+      const phoneTaken = phoneMatchesStored(
+        phoneNumber,
+        existingUser.phoneNumber,
+      );
+      const ninTaken = digitsOnly(NIN) === digitsOnly(existingUser.NIN);
+
+      const message =
+        [emailTaken, phoneTaken, ninTaken].filter(Boolean).length === 1
+          ? emailTaken
+            ? 'Email already exists, please use a different email'
+            : phoneTaken
+              ? 'Phone number already exists, please use a different number'
+              : 'NIN already exists, please use a different NIN'
+          : 'User with existing email, phone number, or NIN already exists';
+
       return {
         statusCode: 409,
-        message:
-          'User with existing email, phone number, or NIN already exists',
-        data: null,
+        message,
+        data: {
+          conflicts: [
+            ...(emailTaken ? ['email'] : []),
+            ...(phoneTaken ? ['phoneNumber'] : []),
+            ...(ninTaken ? ['NIN'] : []),
+          ],
+        },
         error: {
           code: 'USER_ALREADY_EXIST',
-          message:
-            'User with existing email, phone number, or NIN already exists',
+          message,
         },
       };
     } else {
@@ -141,7 +232,7 @@ export class UserService {
         ...createUserDto,
         hub: hubRecord._id,
         NIN: ninAsNumber,
-        phoneNumber: phoneNumberAsNumber,
+        phoneNumber: digitsOnly(phoneNumber) || phoneNumberAsNumber,
         profilePic: profilePic.secure_url,
         age,
         userID: generateUserID(createUserDto.role),
