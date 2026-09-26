@@ -15,7 +15,9 @@ export const responseFormatter = (response: IResponse) => {
       {
         statusCode: response.statusCode || 500,
         message: response.message || 'Internal server error',
-        data: null,
+        // Keep conflict details (e.g. { conflicts: ['email'] }) for the client
+        data: response.data ?? null,
+        error: safeError,
         errors: safeError,
       },
       response.statusCode || 500,
@@ -26,6 +28,7 @@ export const responseFormatter = (response: IResponse) => {
     statusCode: response.statusCode || 200,
     message: response.message || 'Success',
     data: response.data || null,
+    error: null,
     errors: null,
   };
 };

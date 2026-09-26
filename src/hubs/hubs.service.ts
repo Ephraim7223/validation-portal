@@ -145,33 +145,10 @@ export class HubService {
   }
 
   async checkUniqueField(email?: string, phone?: string) {
-    const or: Record<string, unknown>[] = [];
+    const hasEmail = !!email?.trim();
+    const hasPhone = !!phone?.trim();
 
-    if (email?.trim()) {
-      const normalizedEmail = email.trim();
-      or.push({ email: normalizedEmail });
-      or.push({ email: normalizedEmail.toLowerCase() });
-    }
-
-    if (phone) {
-      if (!isValidPhoneInput(phone)) {
-        return {
-          statusCode: 400,
-          message: 'Invalid phone number format',
-          data: null,
-          error: {
-            code: 'INVALID_PHONE',
-            message: 'Invalid phone number format',
-          },
-        };
-      }
-      const variants = phoneMatchVariants(phone);
-      if (variants.length) {
-        or.push({ phone: { $in: variants } });
-      }
-    }
-
-    if (!or.length) {
+    if (!hasEmail && !hasPhone) {
       return {
         statusCode: 400,
         message: 'Provide at least one of email or phone',
@@ -183,44 +160,68 @@ export class HubService {
       };
     }
 
-    const existingHub = await this.hubModel.findOne({ $or: or });
+    if (hasPhone && !isValidPhoneInput(phone)) {
+      return {
+        statusCode: 400,
+        message: 'Invalid phone number format',
+        data: null,
+        error: {
+          code: 'INVALID_PHONE',
+          message: 'Invalid phone number format',
+        },
+      };
+    }
 
-    if (existingHub) {
-      const emailTaken = !!(email && emailsMatch(email, existingHub.email));
-      const phoneTaken = !!(
-        phone && phoneMatchesStored(phone, existingHub.phone)
+    const conflicts: string[] = [];
+
+    if (hasEmail) {
+      const existingByEmail = await this.hubModel.findOne(
+        this.emailQuery(email.trim()),
       );
-      const conflicts: string[] = [];
-      if (emailTaken) conflicts.push('email');
-      if (phoneTaken) conflicts.push('phone');
+      if (existingByEmail) conflicts.push('email');
+    }
 
-      // If $or matched but field compare failed (casing / legacy), still report accurately
-      if (!conflicts.length) {
-        if (email) conflicts.push('email');
-        else if (phone) conflicts.push('phone');
-      }
+    if (hasPhone) {
+      const existingByPhone = await this.hubModel.findOne({
+        phone: { $in: phoneMatchVariants(phone) },
+      });
+      if (existingByPhone) conflicts.push('phone');
+    }
 
+    if (conflicts.length) {
       const message =
-        conflicts.length === 1 && conflicts[0] === 'phone'
-          ? 'Phone number already exists, please use a different number'
-          : conflicts.length === 1 && conflicts[0] === 'email'
+        conflicts.length === 2
+          ? 'Hub with existing email or phone already exists'
+          : conflicts[0] === 'email'
             ? 'Email already exists, please use a different email'
-            : 'Hub with existing email or phone already exists';
+            : 'Phone number already exists, please use a different number';
 
       return {
         statusCode: 409,
         message,
         data: { conflicts },
         error: {
-          code: 'FIELD_ALREADY_EXIST',
+          code:
+            conflicts.length === 2
+              ? 'HUB_ALREADY_EXIST'
+              : conflicts[0] === 'email'
+                ? 'EMAIL_ALREADY_EXIST'
+                : 'PHONE_ALREADY_EXIST',
           message,
         },
       };
     }
 
+    const message =
+      hasEmail && hasPhone
+        ? 'Email and phone are unique'
+        : hasEmail
+          ? 'Email is unique'
+          : 'Phone number is unique';
+
     return {
       statusCode: 200,
-      message: 'Fields are unique',
+      message,
       data: null,
       error: null,
     };
@@ -393,37 +394,55 @@ export class HubService {
     const phoneVariants = phoneMatchVariants(phone);
     const normalizedEmail = email?.trim();
 
+    if (!normalizedEmail) {
+      return {
+        statusCode: 400,
+        message: 'Email is required',
+        data: null,
+        error: {
+          code: 'MISSING_EMAIL',
+          message: 'Email is required',
+        },
+      };
+    }
+
     this.logger.log('Looking for a hub with an existing email or phone');
-    const existingHub = await this.hubModel.findOne({
-      $or: [
-        { email: normalizedEmail },
-        { email: normalizedEmail?.toLowerCase() },
-        { phone: { $in: phoneVariants } },
-      ],
+
+    // Check fields independently so messages match the actual conflict
+    const existingByEmail = await this.hubModel.findOne(
+      this.emailQuery(normalizedEmail),
+    );
+    const existingByPhone = await this.hubModel.findOne({
+      phone: { $in: phoneVariants },
     });
 
-    if (existingHub) {
-      const emailTaken = emailsMatch(normalizedEmail, existingHub.email);
-      const phoneTaken = phoneMatchesStored(phone, existingHub.phone);
+    const emailTaken = !!existingByEmail;
+    const phoneTaken = !!existingByPhone;
+
+    if (emailTaken || phoneTaken) {
+      const conflicts = [
+        ...(emailTaken ? ['email'] : []),
+        ...(phoneTaken ? ['phone'] : []),
+      ];
 
       const message =
-        emailTaken && !phoneTaken
-          ? 'Email already exists, please use a different email'
-          : phoneTaken && !emailTaken
-            ? 'Phone number already exists, please use a different number'
-            : 'Hub with existing email or phone already exists';
+        emailTaken && phoneTaken
+          ? 'Hub with existing email or phone already exists'
+          : emailTaken
+            ? 'Email already exists, please use a different email'
+            : 'Phone number already exists, please use a different number';
 
       response = {
         statusCode: 409,
         message,
-        data: {
-          conflicts: [
-            ...(emailTaken ? ['email'] : []),
-            ...(phoneTaken ? ['phone'] : []),
-          ],
-        },
+        data: { conflicts },
         error: {
-          code: 'HUB_ALREADY_EXIST',
+          code:
+            emailTaken && phoneTaken
+              ? 'HUB_ALREADY_EXIST'
+              : emailTaken
+                ? 'EMAIL_ALREADY_EXIST'
+                : 'PHONE_ALREADY_EXIST',
           message,
         },
       };
@@ -455,7 +474,14 @@ export class HubService {
       });
 
       this.logger.log(`sending success email`);
-      await SuccessMail.mail(newHub.hubName, newHub.email);
+      try {
+        await SuccessMail.mail(newHub.hubName, newHub.email);
+      } catch (mailError) {
+        this.logger.error(
+          `Hub created but welcome email failed for ${newHub.email}`,
+          mailError instanceof Error ? mailError.stack : undefined,
+        );
+      }
 
       response = {
         statusCode: 201,
