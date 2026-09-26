@@ -202,13 +202,7 @@ export class HubsController {
   @ApiOperation({ summary: 'Verify a hub account' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async verifyHub(@Param('id') id: string) {
-    try {
-      return await this.hubsService.verifyHub(id);
-    } catch (error) {
-      throw new BadRequestException(
-        error instanceof Error ? error.message : 'Could not verify hub',
-      );
-    }
+    return this.hubsService.verifyHub(id);
   }
 
   @Patch('suspend/:id')

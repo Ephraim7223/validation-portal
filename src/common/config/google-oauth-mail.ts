@@ -33,7 +33,8 @@ const smtpTransport = createTransport({
     accessToken: accessToken,
   },
   tls: {
-    rejectUnauthorized: true,
+    // Keep verification on in production; allow local/dev relay quirks
+    rejectUnauthorized: process.env.NODE_ENV === 'production',
   },
 });
 

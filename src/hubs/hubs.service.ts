@@ -2,6 +2,7 @@ import * as QRCode from 'qrcode';
 import * as cron from 'node-cron';
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -235,7 +236,35 @@ export class HubService {
   }
 
   isValidObjectId(id: string): boolean {
-    return mongoose.Types.ObjectId.isValid(id);
+    return (
+      mongoose.Types.ObjectId.isValid(id) &&
+      new mongoose.Types.ObjectId(id).toString() === id
+    );
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /** Case-insensitive exact email match (trims whitespace). */
+  private emailQuery(email: string) {
+    const normalized = email.trim();
+    return {
+      email: {
+        $regex: `^${this.escapeRegex(normalized)}$`,
+        $options: 'i',
+      },
+    };
+  }
+
+  private async findHubByIdOrHubId(id: string) {
+    if (!id?.trim()) return null;
+    const trimmed = id.trim();
+    if (this.isValidObjectId(trimmed)) {
+      const byId = await this.hubModel.findById(trimmed);
+      if (byId) return byId;
+    }
+    return this.hubModel.findOne({ hubId: trimmed });
   }
 
   async forgotPassword(
@@ -243,16 +272,19 @@ export class HubService {
   ): Promise<IResponse> {
     const { email } = forgotPasswordDto;
 
-    if (!email) {
+    if (!email?.trim()) {
       throw new BadRequestException('Email is required');
     }
 
+    const normalizedEmail = email.trim();
     const user = await this.hubModel
-      .findOne({ email })
+      .findOne(this.emailQuery(normalizedEmail))
       .select('+otp +otpCreatedAt');
 
     if (!user) {
-      throw new NotFoundException(`User with email ${email} not found`);
+      throw new NotFoundException(
+        `User with email ${normalizedEmail} not found`,
+      );
     }
 
     const otp = this.generateOtp();
@@ -262,10 +294,12 @@ export class HubService {
     user.otpCreatedAt = new Date();
     await user.save();
 
+    const storedEmail = user.email;
+
     setTimeout(
       async () => {
         const userToUpdate = await this.hubModel
-          .findOne({ email })
+          .findOne(this.emailQuery(storedEmail))
           .select('+otp +otpCreatedAt');
         if (userToUpdate && userToUpdate.otp === otp) {
           userToUpdate.otp = undefined;
@@ -276,7 +310,18 @@ export class HubService {
       },
       timeoutMinutes * 60 * 1000,
     );
-    await PasswordResetMail.sendOtp(email, otp, timeoutMinutes);
+
+    try {
+      await PasswordResetMail.sendOtp(storedEmail, otp, timeoutMinutes);
+    } catch (mailError) {
+      this.logger.error(
+        `Failed to send password-reset OTP mail to ${storedEmail}`,
+        mailError instanceof Error ? mailError.stack : undefined,
+      );
+      throw new BadRequestException(
+        'Could not send OTP email. Please try again shortly.',
+      );
+    }
 
     return {
       statusCode: 200,
@@ -646,7 +691,7 @@ export class HubService {
 
   async verifyHub(id: string) {
     try {
-      const hubToUpdate = await this.hubModel.findById(id);
+      const hubToUpdate = await this.findHubByIdOrHubId(id);
       if (!hubToUpdate) {
         throw new NotFoundException('Hub not found');
       }
@@ -662,11 +707,18 @@ export class HubService {
         throw new BadRequestException('Error updating hub');
       }
 
-      await VerifiedMail.mail(
-        updatedHub.email,
-        updatedHub.hubName,
-        updatedHub.hubId,
-      );
+      try {
+        await VerifiedMail.mail(
+          updatedHub.email,
+          updatedHub.hubName,
+          updatedHub.hubId,
+        );
+      } catch (mailError) {
+        this.logger.error(
+          `Hub verified but verification email failed for ${updatedHub.email}`,
+          mailError instanceof Error ? mailError.stack : undefined,
+        );
+      }
 
       return {
         statusCode: 200,
@@ -675,8 +727,13 @@ export class HubService {
         error: null,
       };
     } catch (error) {
-      this.logger.error(`Error verifying hub: ${error.message}`);
-      throw new BadRequestException('Internal Server Error');
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error verifying hub: ${error instanceof Error ? error.message : error}`,
+      );
+      throw new BadRequestException('Could not verify hub');
     }
   }
 
@@ -794,6 +851,15 @@ export class HubService {
   ) {
     const { start_date, end_date } = approveApplicationDto;
 
+    if (!this.isValidObjectId(userId)) {
+      return {
+        statusCode: 400,
+        message: 'Invalid user id',
+        data: null,
+        error: null,
+      };
+    }
+
     const user = await this.userModel.findOne({ _id: userId, hub: hubId });
 
     if (!user) {
@@ -810,6 +876,15 @@ export class HubService {
       return {
         statusCode: 400,
         message: 'Cannot approve a deleted user',
+        data: null,
+        error: null,
+      };
+    }
+
+    if (user.isApproved === 'approved') {
+      return {
+        statusCode: 400,
+        message: 'User is already approved',
         data: null,
         error: null,
       };
@@ -835,6 +910,7 @@ export class HubService {
       const userID = generateUserID(role);
 
       user.duration = duration;
+      user.userID = user.userID || userID;
 
       const hub = await this.hubModel.findById(hubId);
       if (!hub) {
@@ -846,40 +922,50 @@ export class HubService {
         };
       }
 
-      await AcceptanceMail.mail(
-        firstName,
-        lastName,
-        hub.hubName,
-        userID,
-        Stack,
-        role,
-        duration,
-        email,
-        user._id,
-      );
-
       user.isApproved = 'approved';
       user.isCalledForInterview = 'done';
       user.isPaid = true;
       user.isActive = true;
       await user.save();
 
+      try {
+        await AcceptanceMail.mail(
+          firstName,
+          lastName,
+          hub.hubName,
+          user.userID,
+          Stack,
+          role,
+          duration,
+          email,
+          user._id?.toString?.() ?? user._id,
+        );
+      } catch (mailError) {
+        this.logger.error(
+          `User approved but acceptance email failed for ${email}`,
+          mailError instanceof Error ? mailError.stack : undefined,
+        );
+      }
+
       return {
         statusCode: 200,
         message: 'User approved successfully',
-        data: null,
+        data: sanitizeDocument(user),
         error: null,
       };
     } catch (err) {
-      this.logger.log(
-        `Error updating user with id: [${userId}]: ` +
-          JSON.stringify(err, null, 2),
+      this.logger.error(
+        `Error updating user with id: [${userId}]`,
+        err instanceof Error ? err.stack : undefined,
       );
       return {
         statusCode: 400,
         message: 'An error occurred updating user',
         data: null,
-        error: err,
+        error: {
+          code: 'APPROVE_FAILED',
+          message: 'An error occurred updating user',
+        },
       };
     }
   }
