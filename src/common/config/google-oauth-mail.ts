@@ -20,7 +20,6 @@ const oauth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 oauth2Client.setCredentials({
   refresh_token: REFRESH_TOKEN,
 });
-const accessToken = oauth2Client.getAccessToken();
 
 const smtpTransport = createTransport({
   service: 'gmail',
@@ -30,10 +29,14 @@ const smtpTransport = createTransport({
     clientId: CLIENT_ID,
     clientSecret: CLIENT_SECRET,
     refreshToken: REFRESH_TOKEN,
-    accessToken: accessToken,
   },
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 50,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 20000,
   tls: {
-    // Keep verification on in production; allow local/dev relay quirks
     rejectUnauthorized: process.env.NODE_ENV === 'production',
   },
 });
@@ -47,12 +50,5 @@ export const mailTransport = async (
 ) => {
   logger.log(`sending mail to applicant with email: [${to}]`);
   const mailOptions = { from, to, subject, html, attachments };
-  return new Promise((resolve, reject) => {
-    smtpTransport.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        return reject(err);
-      }
-      resolve(info);
-    });
-  });
+  return smtpTransport.sendMail(mailOptions);
 };

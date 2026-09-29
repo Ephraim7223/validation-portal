@@ -13,8 +13,6 @@ import {
   Param,
   Patch,
   Delete,
-  NotFoundException,
-  UnauthorizedException,
   Put,
   UsePipes,
   ValidationPipe,
@@ -209,34 +207,14 @@ export class HubsController {
   @ApiOperation({ summary: 'Suspend a hub' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async suspendHub(@Param('id') id: string) {
-    try {
-      return await this.hubsService.suspendHub(id);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new NotFoundException('Hub not found');
-      } else if (error instanceof BadRequestException) {
-        throw new BadRequestException('Hub is already suspended');
-      } else {
-        throw new UnauthorizedException('Could not suspend hub');
-      }
-    }
+    return this.hubsService.suspendHub(id);
   }
 
   @Patch('unsuspend/:id')
   @ApiOperation({ summary: 'Unsuspend a hub' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async unsuspendHub(@Param('id') id: string) {
-    try {
-      return await this.hubsService.unsuspendHub(id);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new NotFoundException('Hub not found');
-      } else if (error instanceof BadRequestException) {
-        throw new BadRequestException('Hub is not suspended');
-      } else {
-        throw new UnauthorizedException('Could not unsuspend hub');
-      }
-    }
+    return this.hubsService.unsuspendHub(id);
   }
 
   @UseGuards(new JwtGuard(['hub']))

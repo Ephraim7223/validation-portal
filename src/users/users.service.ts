@@ -17,7 +17,7 @@ import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 import { generateUserID } from 'src/functions/genrating-random-number';
 import { Admin } from 'src/auth/schema';
 import { IResponse } from 'src/interfaces/response.interface';
-import { sanitizeDocument } from 'src/common/helpers';
+import { sanitizeDocument, dispatchMail } from 'src/common/helpers';
 import {
   digitsOnly,
   emailsMatch,
@@ -250,11 +250,13 @@ export class UserService {
         await hubRecord.save();
       }
 
-      this.logger.log(`Sending successful application email`);
-      await ApplicationMail.mail(
-        newUser.firstName,
-        newUser.lastName,
-        newUser.email,
+      this.logger.log(`Sending successful application email (background)`);
+      dispatchMail('user-register', () =>
+        ApplicationMail.mail(
+          newUser.firstName,
+          newUser.lastName,
+          newUser.email,
+        ),
       );
 
       response = {
@@ -271,7 +273,7 @@ export class UserService {
 
   async getAllUsers() {
     try {
-      const users = await this.userModel.find().populate('hub');
+      const users = await this.userModel.find().populate('hub').lean();
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
@@ -534,18 +536,19 @@ export class UserService {
       userToSuspend.suspensionReason = suspensionReason;
       const updatedUser = await userToSuspend.save();
 
-      await UserSuspensionMail.mail(
-        updatedUser.firstName,
-        updatedUser.lastName,
-        updatedUser.hub.hubName,
-        updatedUser.email,
-        // suspensionReason,
+      dispatchMail('user-suspend', () =>
+        UserSuspensionMail.mail(
+          updatedUser.firstName,
+          updatedUser.lastName,
+          updatedUser.hub.hubName,
+          updatedUser.email,
+        ),
       );
 
       return {
         statusCode: 200,
         message: 'User suspended successfully',
-        data: updatedUser,
+        data: sanitizeDocument(updatedUser),
         error: null,
       };
     } catch (error) {
@@ -571,17 +574,19 @@ export class UserService {
       userToUnsuspend.isActive = true;
       const updatedUser = await userToUnsuspend.save();
 
-      await UserUnSuspensionMail.mail(
-        updatedUser.firstName,
-        updatedUser.lastName,
-        updatedUser.hub.hubName,
-        updatedUser.email,
+      dispatchMail('user-unsuspend', () =>
+        UserUnSuspensionMail.mail(
+          updatedUser.firstName,
+          updatedUser.lastName,
+          updatedUser.hub.hubName,
+          updatedUser.email,
+        ),
       );
 
       return {
         statusCode: 200,
         message: 'User unsuspended successfully',
-        data: updatedUser,
+        data: sanitizeDocument(updatedUser),
         error: null,
       };
     } catch (error) {

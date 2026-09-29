@@ -25,7 +25,7 @@ import {
   ApproveUserDto,
   ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
-import { JwtHelper } from 'src/common/helpers';
+import { JwtHelper, sanitizeDocument, dispatchMail } from 'src/common/helpers';
 import {
   generateHubID,
   generateUserID,
@@ -40,7 +40,6 @@ import { SubscriptionExpiryMail } from 'src/templates/expiredSuscriptionMail';
 import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
 import { IResponse } from 'src/interfaces';
 import { PasswordResetMail } from 'src/templates/password.reset.mail';
-import { sanitizeDocument } from 'src/common/helpers';
 import { randomInt } from 'crypto';
 import {
   digitsOnly,
@@ -312,17 +311,9 @@ export class HubService {
       timeoutMinutes * 60 * 1000,
     );
 
-    try {
-      await PasswordResetMail.sendOtp(storedEmail, otp, timeoutMinutes);
-    } catch (mailError) {
-      this.logger.error(
-        `Failed to send password-reset OTP mail to ${storedEmail}`,
-        mailError instanceof Error ? mailError.stack : undefined,
-      );
-      throw new BadRequestException(
-        'Could not send OTP email. Please try again shortly.',
-      );
-    }
+    dispatchMail('password-reset-otp', () =>
+      PasswordResetMail.sendOtp(storedEmail, otp, timeoutMinutes),
+    );
 
     return {
       statusCode: 200,
@@ -447,11 +438,11 @@ export class HubService {
         },
       };
     } else {
-      this.logger.log(`uploading CAC to cloud...`);
-      const CAC = await this.cloudinary.upload(createHubDto.CAC[0]);
-
-      this.logger.log(`uploading logo to cloud...`);
-      const logo = await this.cloudinary.upload(createHubDto.logo[0]);
+      this.logger.log(`uploading CAC and logo to cloud...`);
+      const [CAC, logo] = await Promise.all([
+        this.cloudinary.upload(createHubDto.CAC[0]),
+        this.cloudinary.upload(createHubDto.logo[0]),
+      ]);
 
       delete createHubDto.CAC;
       delete createHubDto.logo;
@@ -473,15 +464,10 @@ export class HubService {
         logo: logo.secure_url,
       });
 
-      this.logger.log(`sending success email`);
-      try {
-        await SuccessMail.mail(newHub.hubName, newHub.email);
-      } catch (mailError) {
-        this.logger.error(
-          `Hub created but welcome email failed for ${newHub.email}`,
-          mailError instanceof Error ? mailError.stack : undefined,
-        );
-      }
+      this.logger.log(`sending success email (background)`);
+      dispatchMail('hub-register', () =>
+        SuccessMail.mail(newHub.hubName, newHub.email),
+      );
 
       response = {
         statusCode: 201,
@@ -631,17 +617,19 @@ export class HubService {
       newUser.qrcode = qrCodeData;
       await newUser.save();
 
-      this.logger.log(`Sending successful application email`);
-      await AcceptanceMail.mail(
-        newUser.firstName,
-        newUser.lastName,
-        hub.hubName,
-        newUser.userID,
-        newUser.Stack,
-        newUser.role,
-        newUser.duration,
-        newUser.email,
-        newUser._id,
+      this.logger.log(`Sending successful application email (background)`);
+      dispatchMail('hub-create-user', () =>
+        AcceptanceMail.mail(
+          newUser.firstName,
+          newUser.lastName,
+          hub.hubName,
+          newUser.userID,
+          newUser.Stack,
+          newUser.role,
+          newUser.duration,
+          newUser.email,
+          newUser._id,
+        ),
       );
 
       return {
@@ -702,7 +690,7 @@ export class HubService {
 
   async getAllHubs() {
     try {
-      const hubs = await this.hubModel.find().populate('hubs_users');
+      const hubs = await this.hubModel.find().populate('hubs_users').lean();
       return {
         statusCode: 200,
         message: 'Hubs retrieved successfully',
@@ -733,18 +721,13 @@ export class HubService {
         throw new BadRequestException('Error updating hub');
       }
 
-      try {
-        await VerifiedMail.mail(
+      dispatchMail('hub-verify', () =>
+        VerifiedMail.mail(
           updatedHub.email,
           updatedHub.hubName,
           updatedHub.hubId,
-        );
-      } catch (mailError) {
-        this.logger.error(
-          `Hub verified but verification email failed for ${updatedHub.email}`,
-          mailError instanceof Error ? mailError.stack : undefined,
-        );
-      }
+        ),
+      );
 
       return {
         statusCode: 200,
@@ -826,7 +809,9 @@ export class HubService {
 
       hubToSuspend.isSuspended = true;
       await hubToSuspend.save();
-      await SuspensionMail.mail(hubToSuspend.hubName, hubToSuspend.email);
+      dispatchMail('hub-suspend', () =>
+        SuspensionMail.mail(hubToSuspend.hubName, hubToSuspend.email),
+      );
 
       return {
         statusCode: 200,
@@ -835,6 +820,9 @@ export class HubService {
         error: null,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(`Error suspending hub: ${error.message}`);
       throw new BadRequestException('Could not suspend hub');
     }
@@ -853,9 +841,11 @@ export class HubService {
 
       hubToUnsuspend.isSuspended = false;
       await hubToUnsuspend.save();
-      await UnSuspensionHubMail.mail(
-        hubToUnsuspend.hubName,
-        hubToUnsuspend.email,
+      dispatchMail('hub-unsuspend', () =>
+        UnSuspensionHubMail.mail(
+          hubToUnsuspend.hubName,
+          hubToUnsuspend.email,
+        ),
       );
 
       return {
@@ -865,6 +855,9 @@ export class HubService {
         error: null,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(`Error unsuspending hub: ${error.message}`);
       throw new BadRequestException('Could not unsuspend hub');
     }
@@ -954,8 +947,8 @@ export class HubService {
       user.isActive = true;
       await user.save();
 
-      try {
-        await AcceptanceMail.mail(
+      dispatchMail('user-approve', () =>
+        AcceptanceMail.mail(
           firstName,
           lastName,
           hub.hubName,
@@ -965,13 +958,8 @@ export class HubService {
           duration,
           email,
           user._id?.toString?.() ?? user._id,
-        );
-      } catch (mailError) {
-        this.logger.error(
-          `User approved but acceptance email failed for ${email}`,
-          mailError instanceof Error ? mailError.stack : undefined,
-        );
-      }
+        ),
+      );
 
       return {
         statusCode: 200,
@@ -1057,13 +1045,15 @@ export class HubService {
       user.interview_location = interviewLocation;
       await user.save();
 
-      await InterviewMail.mail(
-        user.email,
-        user.firstName,
-        user.lastName,
-        interviewDto.interviewDate,
-        interviewDto.interviewTime,
-        interviewLocation,
+      dispatchMail('interview-schedule', () =>
+        InterviewMail.mail(
+          user.email,
+          user.firstName,
+          user.lastName,
+          interviewDto.interviewDate,
+          interviewDto.interviewTime,
+          interviewLocation,
+        ),
       );
 
       return {
@@ -1119,9 +1109,11 @@ export class HubService {
         throw new BadRequestException('Invalid hub ID format');
       }
 
-      const usersUnderHub = await this.userModel.find({ hub: hubId });
+      const [hubExists, usersUnderHub] = await Promise.all([
+        this.hubModel.exists({ _id: hubId }),
+        this.userModel.find({ hub: hubId }).lean(),
+      ]);
 
-      const hubExists = await this.hubModel.exists({ _id: hubId });
       if (!hubExists) {
         throw new NotFoundException('Hub not found');
       }
@@ -1286,7 +1278,9 @@ export class HubService {
     hub.paidAt = new Date();
     await hub.save();
 
-    await SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid, hub._id);
+    dispatchMail('hub-payment-status', () =>
+      SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid, hub._id),
+    );
 
     this.scheduleExpiryTask(hubId, hub.paidAt);
 
@@ -1321,7 +1315,9 @@ export class HubService {
             this.logger.log(
               `Updated hub ${hubId} isPaid to false after 20 minutes.`,
             );
-            await SubscriptionExpiryMail.mail(hub.hubName, hub.email);
+            dispatchMail('hub-subscription-expiry', () =>
+              SubscriptionExpiryMail.mail(hub.hubName, hub.email),
+            );
             job.stop();
           } else {
             this.logger.log(
