@@ -1,45 +1,83 @@
-import { createTransport } from 'nodemailer';
+import { createTransport, Transporter } from 'nodemailer';
 import { google } from 'googleapis';
 import { Logger } from '@nestjs/common';
 
-const OAuth2 = google.auth.OAuth2;
-const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, REFRESH_TOKEN, GMAIL_NAME } =
-  process.env;
-
 const logger = new Logger('GoogleMailConfig');
 
-if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !GMAIL_NAME) {
-  logger.warn(
-    'Gmail OAuth env vars are incomplete — outbound mail may fail until they are set.',
-  );
-} else {
-  logger.log(`Gmail OAuth configured for sender: ${GMAIL_NAME}`);
+type MailEnv = {
+  CLIENT_ID: string;
+  CLIENT_SECRET: string;
+  REDIRECT_URI: string;
+  REFRESH_TOKEN: string;
+  GMAIL_NAME: string;
+};
+
+function getMailEnv(): MailEnv {
+  const {
+    CLIENT_ID,
+    CLIENT_SECRET,
+    REDIRECT_URI,
+    REFRESH_TOKEN,
+    GMAIL_NAME,
+  } = process.env;
+
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !GMAIL_NAME) {
+    throw new Error(
+      'Gmail OAuth env vars are incomplete (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN, GMAIL_NAME)',
+    );
+  }
+
+  return {
+    CLIENT_ID,
+    CLIENT_SECRET,
+    REDIRECT_URI:
+      REDIRECT_URI || 'https://developers.google.com/oauthplayground',
+    REFRESH_TOKEN,
+    GMAIL_NAME,
+  };
 }
 
-const oauth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-oauth2Client.setCredentials({
-  refresh_token: REFRESH_TOKEN,
-});
+async function createFreshTransporter(): Promise<{
+  transporter: Transporter;
+  from: string;
+}> {
+  const env = getMailEnv();
+  const OAuth2 = google.auth.OAuth2;
+  const oauth2Client = new OAuth2(
+    env.CLIENT_ID,
+    env.CLIENT_SECRET,
+    env.REDIRECT_URI,
+  );
+  oauth2Client.setCredentials({ refresh_token: env.REFRESH_TOKEN });
 
-const smtpTransport = createTransport({
-  service: 'gmail',
-  auth: {
-    type: 'OAuth2',
-    user: GMAIL_NAME,
-    clientId: CLIENT_ID,
-    clientSecret: CLIENT_SECRET,
-    refreshToken: REFRESH_TOKEN,
-  },
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 50,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 20000,
-  tls: {
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-  },
-});
+  const tokenResponse = await oauth2Client.getAccessToken();
+  const accessToken =
+    typeof tokenResponse === 'string'
+      ? tokenResponse
+      : tokenResponse?.token || undefined;
+
+  if (!accessToken) {
+    throw new Error('Failed to obtain Gmail OAuth access token');
+  }
+
+  const transporter = createTransport({
+    service: 'gmail',
+    auth: {
+      type: 'OAuth2',
+      user: env.GMAIL_NAME,
+      clientId: env.CLIENT_ID,
+      clientSecret: env.CLIENT_SECRET,
+      refreshToken: env.REFRESH_TOKEN,
+      accessToken,
+    },
+    // Match the previously working Gmail relay behavior on hosts like Render
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  return { transporter, from: env.GMAIL_NAME };
+}
 
 export const mailTransport = async (
   from: string,
@@ -48,7 +86,28 @@ export const mailTransport = async (
   html,
   attachments?,
 ) => {
-  logger.log(`sending mail to applicant with email: [${to}]`);
-  const mailOptions = { from, to, subject, html, attachments };
-  return smtpTransport.sendMail(mailOptions);
+  if (!to) {
+    throw new Error('Mail recipient (to) is required');
+  }
+
+  logger.log(`sending mail to applicant with email: [${to}] subject=[${subject}]`);
+
+  const { transporter, from: defaultFrom } = await createFreshTransporter();
+  const sender = from || defaultFrom;
+
+  try {
+    const info = await transporter.sendMail({
+      from: sender,
+      to,
+      subject,
+      html,
+      attachments,
+    });
+    logger.log(
+      `mail accepted for [${to}] messageId=${info?.messageId || 'n/a'}`,
+    );
+    return info;
+  } finally {
+    transporter.close();
+  }
 };

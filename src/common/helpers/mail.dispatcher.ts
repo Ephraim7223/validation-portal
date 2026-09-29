@@ -3,15 +3,19 @@ import { Logger } from '@nestjs/common';
 const logger = new Logger('MailDispatcher');
 
 /**
- * Fire-and-forget outbound mail so HTTP handlers return immediately
- * after the database write, instead of waiting on SMTP/OAuth.
+ * Start outbound mail without blocking the HTTP response.
+ * Starts the promise immediately (not deferred) so work begins
+ * before the response is fully flushed on hosts like Render.
  */
 export function dispatchMail(
   label: string,
   send: () => Promise<unknown>,
 ): void {
-  setImmediate(() => {
-    send().catch((err) => {
+  void send()
+    .then(() => {
+      logger.log(`Background mail sent [${label}]`);
+    })
+    .catch((err) => {
       logger.error(
         `Background mail failed [${label}]: ${
           err instanceof Error ? err.message : err
@@ -19,5 +23,4 @@ export function dispatchMail(
         err instanceof Error ? err.stack : undefined,
       );
     });
-  });
 }

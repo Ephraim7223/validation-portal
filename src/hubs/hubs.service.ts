@@ -311,9 +311,17 @@ export class HubService {
       timeoutMinutes * 60 * 1000,
     );
 
-    dispatchMail('password-reset-otp', () =>
-      PasswordResetMail.sendOtp(storedEmail, otp, timeoutMinutes),
-    );
+    try {
+      await PasswordResetMail.sendOtp(storedEmail, otp, timeoutMinutes);
+    } catch (mailError) {
+      this.logger.error(
+        `Failed to send password-reset OTP mail to ${storedEmail}`,
+        mailError instanceof Error ? mailError.stack : undefined,
+      );
+      throw new BadRequestException(
+        'Could not send OTP email. Please try again shortly.',
+      );
+    }
 
     return {
       statusCode: 200,

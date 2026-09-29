@@ -6,7 +6,7 @@ export const mailGenerator = new Mailgen({
   product: {
     name: 'PLACEDEV PORTAL',
     link: 'https://pdcvp.netlify.app/',
-    logo: 'https://res.cloudinary.com/dvikxcdh3/image/upload/v1716814797/pictda_asm3qg.png    ',
+    logo: 'https://res.cloudinary.com/dvikxcdh3/image/upload/v1716814797/pictda_asm3qg.png',
     logoHeight: '100px',
   },
 });
