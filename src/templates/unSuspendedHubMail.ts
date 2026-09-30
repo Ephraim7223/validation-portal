@@ -1,26 +1,23 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { portalUrl, renderEmail } from './layout';
 
 export class UnSuspensionHubMail {
   static async mail(hubName: string, email: string) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `We are writing to inform you that your account with placdevportal has been reactivated.`,
-          // `You can now login and resume duties`,
-          `If you have any questions or need further assistance, please contact us at .`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Account Reactivation Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Account',
+      title: 'Your hub has been restored',
+      greeting: `Dear ${hubName},`,
+      paragraphs: [
+        'Your hub account is active again. You can sign in and continue managing members.',
+      ],
+      button: { label: 'Sign in', href: portalUrl('sign-in') },
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your hub account has been restored',
+      html,
+    );
   }
 }

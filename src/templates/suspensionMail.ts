@@ -1,30 +1,23 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { renderEmail } from './layout';
 
 export class SuspensionMail {
-  static async mail(
-    hubName: string,
-    // remainingDays: number,
-    email: string,
-  ) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `We are writing to inform you that your account with placdevportal has been suspended.`,
-          // `You have ${remainingDays} till suspension`,
-          `If you have any questions or need further assistance, please contact us at .`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Account Suspension Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+  static async mail(hubName: string, email: string) {
+    const html = renderEmail({
+      eyebrow: 'Account',
+      title: 'Your hub has been suspended',
+      greeting: `Dear ${hubName},`,
+      paragraphs: [
+        'Your hub account has been suspended. You will not be able to manage members until it is restored.',
+        'Reply to this email if you believe this was a mistake or you need help restoring the account.',
+      ],
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your hub account has been suspended',
+      html,
+    );
   }
 }

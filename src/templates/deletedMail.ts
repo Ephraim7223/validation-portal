@@ -1,5 +1,5 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { renderEmail } from './layout';
 
 export class DeletedMail {
   static async mail(
@@ -8,23 +8,21 @@ export class DeletedMail {
     organisation: string,
     email: string,
   ) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${firstName} ${lastName}`,
-        intro: [
-          `We are writing to inform you that your account with ${organisation} has been deleted.`,
-          `If you have any questions or need further assistance, please contact us at .`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Account Deletion Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Account',
+      title: 'Your membership record was removed',
+      greeting: `Dear ${firstName} ${lastName},`,
+      paragraphs: [
+        `Your record with ${organisation} has been deleted.`,
+        'Contact the hub if you think this was a mistake.',
+      ],
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your membership record was removed',
+      html,
+    );
   }
 }

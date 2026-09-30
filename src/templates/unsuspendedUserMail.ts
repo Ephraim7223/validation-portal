@@ -1,5 +1,5 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { renderEmail } from './layout';
 
 export class UserUnSuspensionMail {
   static async mail(
@@ -8,23 +8,21 @@ export class UserUnSuspensionMail {
     hub: string,
     email: string,
   ) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${firstName} ${lastName}`,
-        intro: [
-          `We are writing to inform you that your account with ${hub} has been reactivated.`,
-          `If you have any questions or need further assistance, please contact us at .`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Account Reactivation Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Membership',
+      title: 'Your membership has been restored',
+      greeting: `Dear ${firstName} ${lastName},`,
+      paragraphs: [
+        `Your membership with ${hub} is active again.`,
+        'Contact your hub if you still cannot use your ID.',
+      ],
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your membership has been restored',
+      html,
+    );
   }
 }

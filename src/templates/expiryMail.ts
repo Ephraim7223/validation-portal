@@ -1,26 +1,29 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { portalUrl, renderEmail } from './layout';
 
 export class ExpiryMail {
   static async mail(hubName: string, remainingDays: number, email: string) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `We are writing to inform you that your account with placdevportal has been suspended.`,
-          `You have ${remainingDays} till suspension`,
-          `If you have any questions or need further assistance, please contact us at .`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Account Expiry Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Subscription',
+      title: 'Your subscription is ending soon',
+      greeting: `Dear ${hubName},`,
+      paragraphs: [
+        `Your hub subscription will lapse in ${remainingDays} day${remainingDays === 1 ? '' : 's'}. Renew it to keep managing members.`,
+      ],
+      details: [
+        {
+          label: 'Time left',
+          value: `${remainingDays} day${remainingDays === 1 ? '' : 's'}`,
+        },
+      ],
+      button: { label: 'Open the portal', href: portalUrl('sign-in') },
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your hub subscription is ending soon',
+      html,
+    );
   }
 }

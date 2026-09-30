@@ -698,7 +698,7 @@ export class HubService {
       hub.hubs_users.push(newUser._id);
       await hub.save();
 
-      const websiteUrl = 'https://verifytech.netlify.app/';
+      const websiteUrl = 'https://devverify.pl.gov.ng/';
 
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;
@@ -716,6 +716,8 @@ export class HubService {
           newUser.duration,
           newUser.email,
           newUser._id,
+          newUser.createdAt,
+          newUser.end_date,
         ),
       );
 
@@ -1067,6 +1069,8 @@ export class HubService {
           duration,
           email,
           user._id?.toString?.() ?? user._id,
+          user.createdAt,
+          user.end_date,
         ),
       );
 
@@ -1400,8 +1404,19 @@ export class HubService {
     }
     await hub.save();
 
+    const subscriptionExpiry = hub.isPaid
+      ? this.subscriptionExpiry(hub.paidAt)
+      : null;
+
     dispatchMail('hub-payment-status', () =>
-      SubscriptionStatusMail.mail(hub.hubName, hub.email, hub.isPaid, hub._id),
+      SubscriptionStatusMail.mail(
+        hub.hubName,
+        hub.email,
+        hub.isPaid,
+        hub._id,
+        hub.createdAt,
+        subscriptionExpiry,
+      ),
     );
 
     return {

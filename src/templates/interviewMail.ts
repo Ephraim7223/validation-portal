@@ -1,5 +1,5 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { renderEmail } from './layout';
 
 export class InterviewMail {
   static async mail(
@@ -10,31 +10,26 @@ export class InterviewMail {
     interviewTime: string,
     interviewLocation: string,
   ) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${firstName} ${lastName}`,
-        intro: [
-          `Congratulations! We are pleased to inform you of your interview.`,
-          `<h2>Interview Details</h2>`,
-          `Date: ${interviewDate}`,
-          `Time: ${interviewTime}`,
-          `Location: ${interviewLocation}`,
-        ],
-        outro: [
-          "For further assistance and enquiries about your organization's activities, please do not hesitate to contact us.",
-        ],
-      },
-    };
+    const html = renderEmail({
+      eyebrow: 'Interview',
+      title: 'Your interview is scheduled',
+      greeting: `Dear ${firstName} ${lastName},`,
+      paragraphs: [
+        'The hub has scheduled an interview for your application. Please arrive at the time below.',
+      ],
+      details: [
+        { label: 'Date', value: String(interviewDate ?? '') },
+        { label: 'Time', value: interviewTime || 'To be confirmed' },
+        { label: 'Location', value: interviewLocation || 'To be confirmed' },
+      ],
+      note: 'Contact your hub if you need to change the time.',
+    });
 
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Invitation for Interview!',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your interview has been scheduled',
+      html,
+    );
   }
 }

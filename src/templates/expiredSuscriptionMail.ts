@@ -1,27 +1,23 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from 'src/common/config/mailgen';
+import { portalUrl, renderEmail } from './layout';
 
 export class SubscriptionExpiryMail {
   static async mail(hubName: string, email: string) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `We are writing to inform you that your subscription has expired.`,
-          `Your subscription for a yearly usage has ended.`,
-          `You can renew your subscription to continue accessing your dashboard.`,
-          `If you have any questions or need further assistance, please contact us at info@pitda.ng.`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Subscription Expiry Notification',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Subscription',
+      title: 'Your subscription has expired',
+      greeting: `Dear ${hubName},`,
+      paragraphs: [
+        'Your yearly hub subscription has ended. Renew it to continue using the dashboard.',
+      ],
+      button: { label: 'Open the portal', href: portalUrl('sign-in') },
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Your hub subscription has expired',
+      html,
+    );
   }
 }

@@ -284,7 +284,7 @@ export class UserService {
         userID: generateUserID(createUserDto.role),
       });
 
-      const websiteUrl = 'https://verifytech.netlify.app/';
+      const websiteUrl = 'https://devverify.pl.gov.ng/';
 
       const qrCodeData = await QRCode.toDataURL(websiteUrl);
       newUser.qrcode = qrCodeData;

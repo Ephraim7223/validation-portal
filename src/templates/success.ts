@@ -1,27 +1,24 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from '../common/config/mailgen';
+import { portalUrl, renderEmail } from './layout';
 
 export class SuccessMail {
   static async mail(hubName: string, email: string) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `Registration Successful Please wait for verification before logging in.`,
-        ],
-        outro: [
-          'For further assistance and enquiries about your organisation`s activities, please do not hesitate to contact us.',
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Congratulations on Your Registration!',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+    const html = renderEmail({
+      eyebrow: 'Registration',
+      title: 'Hub registration received',
+      greeting: `Dear ${hubName},`,
+      paragraphs: [
+        'Your hub registration was received. An administrator will verify the account before you can sign in.',
+        'You will get another email when the hub is verified, with your Hub ID and the next step.',
+      ],
+      button: { label: 'Visit the portal', href: portalUrl() },
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      'Hub registration received',
+      html,
+    );
   }
 }

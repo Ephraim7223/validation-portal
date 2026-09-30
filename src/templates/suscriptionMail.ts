@@ -1,29 +1,48 @@
 import { mailTransport } from 'src/common/config';
-import { mailGenerator } from 'src/common/config/mailgen';
+import { formatMailDate, portalUrl, renderEmail } from './layout';
 
 export class SubscriptionStatusMail {
-  static async mail(hubName: string, email: string, isPaid: boolean, _id: any) {
-    const html = {
-      body: {
-        signature: false,
-        greeting: `Dear ${hubName}`,
-        intro: [
-          `We are writing to inform you that your subscription status has been updated.`,
-          `Your current subscription status is: ${isPaid ? 'Active' : 'Inactive'}.`,
-          `You have subscribed for a yearly usage.`,
-          `You can now access your dashboard to manage your hub's details and activities.`,
-          `If you have any questions or need further assistance, please contact us.`,
-          `Click on the link to download your certificate: https://pdcvp.netlify.app/print-certificate/${_id}`,
-        ],
-      },
-    };
-    const template = mailGenerator.generate(html);
-    const mail = {
-      to: email,
-      subject: 'Subscription Status Update',
-      from: process.env.GMAIL_NAME,
-      html: template,
-    };
-    return mailTransport(mail.from, mail.to, mail.subject, mail.html);
+  static async mail(
+    hubName: string,
+    email: string,
+    isPaid: boolean,
+    _id: any,
+    registeredAt?: Date | string | null,
+    expiresAt?: Date | string | null,
+  ) {
+    const html = renderEmail({
+      eyebrow: 'Subscription',
+      title: isPaid ? 'Your subscription is active' : 'Your subscription is inactive',
+      greeting: `Dear ${hubName},`,
+      paragraphs: isPaid
+        ? [
+            'Your hub subscription is active for one year. You can manage members from your dashboard, and your registration certificate is ready.',
+          ]
+        : [
+            'Your hub subscription is inactive. Renew it from the dashboard to keep managing members.',
+          ],
+      details: [
+        { label: 'Status', value: isPaid ? 'Active' : 'Inactive' },
+        { label: 'Plan', value: 'Yearly hub subscription' },
+        { label: 'Registration date', value: formatMailDate(registeredAt) },
+        { label: 'Expiry date', value: formatMailDate(expiresAt) },
+      ],
+      button: isPaid
+        ? {
+            label: 'Download certificate',
+            href: portalUrl(`print-certificate/${_id}`),
+          }
+        : {
+            label: 'Open the portal',
+            href: portalUrl(),
+          },
+    });
+
+    return mailTransport(
+      process.env.GMAIL_NAME,
+      email,
+      isPaid ? 'Your hub subscription is active' : 'Your hub subscription is inactive',
+      html,
+    );
   }
 }
