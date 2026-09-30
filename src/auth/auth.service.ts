@@ -10,7 +10,7 @@ import { Model } from 'mongoose';
 import { SignInDto } from './dto';
 import { IResponse } from 'src/interfaces';
 import * as argon from 'argon2';
-import { JwtHelper } from 'src/common/helpers';
+import { JwtHelper, normalizeAccountRole } from 'src/common/helpers';
 import { Admin } from './schema/user.schema';
 
 @Injectable()
@@ -39,13 +39,21 @@ export class AuthService {
         throw new UnauthorizedException('Invalid login credentials');
       }
 
-      const accessToken = JwtHelper.signToken(admin.id, admin.role);
+      const canonicalRole = normalizeAccountRole(admin.role);
+      if (!canonicalRole || (canonicalRole !== 'admin' && canonicalRole !== 'super-admin')) {
+        throw new UnauthorizedException('Invalid admin role');
+      }
+
+      // Keep legacy Super-admin label for existing clients; normalize for JWT checks
+      const tokenRole =
+        canonicalRole === 'super-admin' ? 'Super-admin' : 'admin';
+      const accessToken = JwtHelper.signToken(admin.id, tokenRole);
 
       this.logger.log(`Admin signed in successfully`);
       return {
         statusCode: 200,
         message: 'Signed in successfully',
-        data: { accessToken, role: admin.role },
+        data: { accessToken, role: tokenRole },
         error: null,
       };
     } catch (error) {

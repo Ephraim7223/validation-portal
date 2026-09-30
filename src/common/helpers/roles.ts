@@ -1,6 +1,9 @@
 export type AccountRole = 'admin' | 'super-admin' | 'hub';
 
-/** Accepts admin, Super-admin, super-admin, and hub. */
+/** Canonical admin roles for JwtGuard allow-lists (admin implies super-admin via roleAllowed). */
+export const ADMIN_ROLES = ['admin', 'super-admin'] as const;
+
+/** Accepts admin, Super-admin, super-admin, Super Admin, hub, etc. */
 export function normalizeAccountRole(
   role?: string | null,
 ): AccountRole | null {
@@ -9,8 +12,14 @@ export function normalizeAccountRole(
     .toLowerCase()
     .replace(/[\s_]+/g, '-');
 
-  if (value === 'super-admin' || value === 'superadmin') return 'super-admin';
-  if (value === 'admin') return 'admin';
+  if (
+    value === 'super-admin' ||
+    value === 'superadmin' ||
+    value === 'super-administrator'
+  ) {
+    return 'super-admin';
+  }
+  if (value === 'admin' || value === 'administrator') return 'admin';
   if (value === 'hub') return 'hub';
   return null;
 }
@@ -29,7 +38,7 @@ export function roleAllowed(
   allowed: string[],
 ): boolean {
   const actual = normalizeAccountRole(actualRole);
-  if (!actual || allowed.length === 0) return false;
+  if (!actual || !allowed?.length) return false;
 
   return allowed.some((role) => {
     const expected = normalizeAccountRole(role);

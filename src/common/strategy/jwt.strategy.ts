@@ -22,16 +22,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: { sub: string; role: string }) {
-    let user;
-    const accountRole = normalizeAccountRole(payload.role);
+    let user: Record<string, unknown> | null = null;
+    const tokenRole = normalizeAccountRole(payload.role);
 
-    if (isAdminRole(accountRole)) {
+    if (isAdminRole(payload.role) || isAdminRole(tokenRole)) {
       user = await this.adminModel
         .findById(payload.sub)
         .select('-password -secretToken')
         .lean()
         .exec();
-    } else if (accountRole === 'hub') {
+    } else if (tokenRole === 'hub' || normalizeAccountRole(payload.role) === 'hub') {
       user = await this.hubModel
         .findById(payload.sub)
         .select('-password -otp -otpCreatedAt -secretToken')
@@ -43,6 +43,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User not found');
     }
 
-    return user;
+    // Prefer DB role, fall back to JWT claim — always keep a usable role for guards
+    const resolvedRole = user.role || payload.role;
+    const normalized =
+      normalizeAccountRole(String(resolvedRole)) ||
+      normalizeAccountRole(payload.role);
+
+    if (!normalized) {
+      throw new UnauthorizedException('Account role is invalid');
+    }
+
+    return {
+      ...user,
+      role: resolvedRole,
+      // Canonical role used by JwtGuard / RolesGuard
+      accountRole: normalized,
+    };
   }
 }

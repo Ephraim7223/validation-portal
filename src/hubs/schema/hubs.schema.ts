@@ -65,6 +65,9 @@ export class Hub {
 
   @Prop({ type: String, enum: Object.values(categoryEnum), required: true })
   category: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const HubSchema = SchemaFactory.createForClass(Hub);

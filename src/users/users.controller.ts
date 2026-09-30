@@ -112,7 +112,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get()
   @ApiOperation({ summary: 'List all users' })
@@ -127,7 +127,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Delete()
   @ApiOperation({
@@ -145,7 +145,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get('hub/:hubId')
   @ApiOperation({ summary: 'List users belonging to a hub' })
@@ -161,7 +161,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get('role/:role')
   @ApiOperation({ summary: 'List users by role' })
@@ -198,7 +198,7 @@ export class UserController {
     return await this.userService.unSuspendUser(id, req.user);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get('stacks/count')
   @ApiOperation({ summary: 'Count users per stack (global)' })
@@ -206,7 +206,7 @@ export class UserController {
     return await this.userService.getStacksCount();
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get('users/count-by-role-and-month')
   @ApiOperation({ summary: 'Aggregate user counts by role and month' })
@@ -225,7 +225,7 @@ export class UserController {
     return await this.userService.search(query);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Post('getUsersByOrganisation')
   @ApiOperation({ summary: 'List users by organisation name' })
@@ -239,7 +239,7 @@ export class UserController {
     return await this.userService.getUsersByOrganisation(organisation);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Get('pending')
   @ApiOperation({
@@ -251,7 +251,7 @@ export class UserController {
   }
 
   @Post('admin/me')
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @ApiOperation({
     summary: 'Get authenticated admin profile',
@@ -278,7 +278,7 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a user by id' })

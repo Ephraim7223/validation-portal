@@ -191,7 +191,7 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Patch('verify/:id')
   @ApiOperation({ summary: 'Verify a hub account' })
@@ -200,7 +200,7 @@ export class HubsController {
     return this.hubsService.verifyHub(id);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Patch('suspend/:id')
   @ApiOperation({ summary: 'Suspend a hub' })
@@ -209,7 +209,7 @@ export class HubsController {
     return this.hubsService.suspendHub(id);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Patch('unsuspend/:id')
   @ApiOperation({ summary: 'Unsuspend a hub' })
@@ -386,7 +386,7 @@ export class HubsController {
     return this.hubsService.getSingleHub(id);
   }
 
-  @UseGuards(new JwtGuard(['admin']))
+  @UseGuards(new JwtGuard(['admin', 'super-admin']))
   @ApiBearerAuth('JWT')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a hub by id' })

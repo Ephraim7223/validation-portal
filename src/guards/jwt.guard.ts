@@ -18,10 +18,13 @@ export class JwtGuard extends AuthGuard('jwt') {
       );
     }
 
-    if (this.roles.length > 0 && !roleAllowed(user.role, this.roles)) {
-      throw new ForbiddenException(
-        'You do not have permission to access this resource',
-      );
+    if (this.roles.length > 0) {
+      const candidateRole = user.accountRole || user.role;
+      if (!roleAllowed(candidateRole, this.roles)) {
+        throw new ForbiddenException(
+          'You do not have permission to access this resource',
+        );
+      }
     }
 
     return user;
