@@ -129,7 +129,7 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @ApiBearerAuth('JWT')
   @Post('register-user')
   @ApiOperation({
@@ -163,12 +163,7 @@ export class HubsController {
       hubId,
     );
 
-    return {
-      statusCode: newUser.statusCode,
-      message: newUser.message,
-      data: newUser.data,
-      error: newUser.error,
-    };
+    return responseFormatter(newUser);
   }
 
   @HttpCode(HttpStatus.OK)
@@ -196,6 +191,8 @@ export class HubsController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Patch('verify/:id')
   @ApiOperation({ summary: 'Verify a hub account' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
@@ -203,6 +200,8 @@ export class HubsController {
     return this.hubsService.verifyHub(id);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Patch('suspend/:id')
   @ApiOperation({ summary: 'Suspend a hub' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
@@ -210,6 +209,8 @@ export class HubsController {
     return this.hubsService.suspendHub(id);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Patch('unsuspend/:id')
   @ApiOperation({ summary: 'Unsuspend a hub' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
@@ -248,10 +249,12 @@ export class HubsController {
     @Body() approveApplicationDto: ApproveApplicationDto,
   ) {
     const hubId = req.user._id;
-    return this.hubsService.approveUser(
-      approveApplicationDto,
-      userId,
-      hubId,
+    return responseFormatter(
+      await this.hubsService.approveUser(
+        approveApplicationDto,
+        userId,
+        hubId,
+      ),
     );
   }
 
@@ -272,12 +275,7 @@ export class HubsController {
         hubId,
         interviewDto,
       );
-      return {
-        statusCode: result.statusCode,
-        message: result.message,
-        data: result.data,
-        error: result.error,
-      };
+      return responseFormatter(result);
     } catch (error) {
       this.logger.error(
         `Error scheduling interview: ${error instanceof Error ? error.message : error}`,
@@ -286,7 +284,7 @@ export class HubsController {
     }
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @ApiBearerAuth('JWT')
   @Get('users/pending-interview')
   @ApiOperation({ summary: 'List users pending interview for the hub' })
@@ -295,7 +293,7 @@ export class HubsController {
     return this.hubsService.getUsersPendingInterview(hubId);
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @ApiBearerAuth('JWT')
   @Get('users/role/:role')
   @ApiOperation({ summary: 'List hub users filtered by role' })
@@ -305,7 +303,7 @@ export class HubsController {
     return this.hubsService.getUsersByRole(role, hubId);
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @ApiBearerAuth('JWT')
   @Get('stacks/count')
   @ApiOperation({ summary: 'Count users per stack for the authenticated hub' })
@@ -334,14 +332,21 @@ export class HubsController {
     return await this.hubsService.getUsersCountByRoleAndMonth(hubId);
   }
 
+  @UseGuards(new JwtGuard(['admin', 'hub']))
+  @ApiBearerAuth('JWT')
   @Patch('payment/:id')
   @ApiOperation({ summary: 'Update hub paid / subscription status' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })
   async updatePaidStatus(
     @Param('id') id: string,
     @Body() updatePaidStatusDto: UpdatePaidStatusDto,
+    @Req() req,
   ) {
-    return this.hubsService.updatePaidStatus(id, updatePaidStatusDto);
+    return this.hubsService.updatePaidStatus(
+      id,
+      updatePaidStatusDto,
+      req.user,
+    );
   }
 
   @Patch('forgot-password')
@@ -362,7 +367,7 @@ export class HubsController {
   }
 
   @Post('me')
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['hub']))
   @ApiBearerAuth('JWT')
   @ApiOperation({
     summary: 'Get authenticated hub profile',
@@ -381,6 +386,8 @@ export class HubsController {
     return this.hubsService.getSingleHub(id);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a hub by id' })
   @ApiParam({ name: 'id', description: 'Hub MongoDB ObjectId' })

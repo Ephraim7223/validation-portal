@@ -112,6 +112,8 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Get()
   @ApiOperation({ summary: 'List all users' })
   async getAllUsers() {
@@ -125,10 +127,12 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Delete()
   @ApiOperation({
     summary: 'Delete all users',
-    description: 'Destructive operation — removes every user document.',
+    description: 'Destructive operation — removes every user document. Admin only.',
   })
   async deleteAllUsers() {
     try {
@@ -141,6 +145,8 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Get('hub/:hubId')
   @ApiOperation({ summary: 'List users belonging to a hub' })
   @ApiParam({ name: 'hubId' })
@@ -155,6 +161,8 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Get('role/:role')
   @ApiOperation({ summary: 'List users by role' })
   @ApiParam({ name: 'role', example: 'intern' })
@@ -168,29 +176,38 @@ export class UserController {
     }
   }
 
+  @UseGuards(new JwtGuard(['admin', 'hub']))
+  @ApiBearerAuth('JWT')
   @Patch('suspend/:id')
   @ApiOperation({ summary: 'Suspend a user' })
   @ApiParam({ name: 'id' })
   async requestSuspension(
     @Param('id') id: string,
     @Body() suspensionDto: SuspensionDto,
+    @Req() req,
   ): Promise<any> {
-    return this.userService.suspendUser(id, suspensionDto);
+    return this.userService.suspendUser(id, suspensionDto, req.user);
   }
 
+  @UseGuards(new JwtGuard(['admin', 'hub']))
+  @ApiBearerAuth('JWT')
   @Patch('unsuspend/:id')
   @ApiOperation({ summary: 'Unsuspend a user' })
   @ApiParam({ name: 'id' })
-  async unSuspendUser(@Param('id') id: string) {
-    return await this.userService.unSuspendUser(id);
+  async unSuspendUser(@Param('id') id: string, @Req() req) {
+    return await this.userService.unSuspendUser(id, req.user);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Get('stacks/count')
   @ApiOperation({ summary: 'Count users per stack (global)' })
   async getStacksCount() {
     return await this.userService.getStacksCount();
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Get('users/count-by-role-and-month')
   @ApiOperation({ summary: 'Aggregate user counts by role and month' })
   async getUsersCountByRoleAndMonth() {
@@ -208,6 +225,8 @@ export class UserController {
     return await this.userService.search(query);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Post('getUsersByOrganisation')
   @ApiOperation({ summary: 'List users by organisation name' })
   @ApiBody({ type: OrganisationUsersDto })
@@ -220,8 +239,19 @@ export class UserController {
     return await this.userService.getUsersByOrganisation(organisation);
   }
 
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
+  @Get('pending')
+  @ApiOperation({
+    summary: 'List pending applicants across all hubs',
+    description: 'Admin overview. Hub accounts should use GET /hubs/users/pending-users.',
+  })
+  async getPendingUsers() {
+    return this.userService.getPendingUsers();
+  }
+
   @Post('admin/me')
-  @UseGuards(JwtGuard)
+  @UseGuards(new JwtGuard(['admin']))
   @ApiBearerAuth('JWT')
   @ApiOperation({
     summary: 'Get authenticated admin profile',
@@ -248,6 +278,8 @@ export class UserController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(new JwtGuard(['admin']))
+  @ApiBearerAuth('JWT')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a user by id' })
   @ApiParam({ name: 'id' })

@@ -1,6 +1,8 @@
 import * as QRCode from 'qrcode';
 import {
   BadRequestException,
+  ForbiddenException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,7 +19,13 @@ import { ApplicationMail } from 'src/templates/successfulApplicationMail';
 import { generateUserID } from 'src/functions/genrating-random-number';
 import { Admin } from 'src/auth/schema';
 import { IResponse } from 'src/interfaces/response.interface';
-import { sanitizeDocument, dispatchMail } from 'src/common/helpers';
+import {
+  sanitizeDocument,
+  dispatchMail,
+  canonicalPersonnelRole,
+  isAdminRole,
+  normalizeAccountRole,
+} from 'src/common/helpers';
 import {
   digitsOnly,
   emailsMatch,
@@ -25,6 +33,7 @@ import {
   phoneMatchVariants,
   phoneMatchesStored,
 } from 'src/utils/phone.util';
+import { validateApplicantFields } from 'src/utils/applicant.validation';
 
 @Injectable()
 export class UserService {
@@ -40,8 +49,34 @@ export class UserService {
     private readonly adminModel: Model<Admin>,
   ) {}
 
-  isValidObjectId(id: string): boolean {
-    return mongoose.Types.ObjectId.isValid(id);
+  isValidObjectId(id: unknown): boolean {
+    if (id == null) return false;
+    const value = String(id).trim();
+    return (
+      /^[a-fA-F0-9]{24}$/.test(value) && mongoose.Types.ObjectId.isValid(value)
+    );
+  }
+
+  private memberHubId(user: { hub?: unknown }): string {
+    const hub = user.hub as { _id?: unknown } | undefined;
+    if (hub && typeof hub === 'object' && hub._id) return String(hub._id);
+    return String(user.hub);
+  }
+
+  private assertCanManageUser(
+    actor: { _id: unknown; role?: string },
+    user: { hub?: unknown },
+  ) {
+    if (isAdminRole(actor?.role)) return;
+    if (
+      normalizeAccountRole(actor?.role) === 'hub' &&
+      this.memberHubId(user) === String(actor._id)
+    ) {
+      return;
+    }
+    throw new ForbiddenException(
+      'You do not have permission to manage this member',
+    );
   }
 
   private getPublicIdFromUrl(imageUrl: string): string {
@@ -74,9 +109,18 @@ export class UserService {
     }
     if (NIN) {
       const ninDigits = digitsOnly(NIN);
-      if (ninDigits) {
-        or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
+      if (!/^\d{11}$/.test(ninDigits)) {
+        return {
+          statusCode: 400,
+          message: 'NIN must be 11 digits',
+          data: null,
+          error: {
+            code: 'INVALID_NIN',
+            message: 'NIN must be 11 digits',
+          },
+        };
       }
+      or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
     }
 
     if (!or.length) {
@@ -144,27 +188,29 @@ export class UserService {
     let response: any;
     const { email, hub, NIN, phoneNumber, D_O_B } = createUserDto;
 
-    const ninAsNumber = parseInt(NIN);
-    if (isNaN(ninAsNumber)) {
-      return { message: 'Invalid NIN format' };
+    const checked = validateApplicantFields({
+      email,
+      phoneNumber,
+      NIN,
+      D_O_B,
+      gender: createUserDto.gender,
+      role: createUserDto.role,
+    });
+    if (checked.ok === false) {
+      return {
+        statusCode: 400,
+        message: checked.message,
+        data: null,
+        error: {
+          code: 'INVALID_APPLICANT',
+          message: checked.message,
+        },
+      };
     }
 
-    const phoneNumberAsNumber = parseInt(phoneNumber);
-    if (isNaN(phoneNumberAsNumber)) {
-      return { message: 'Invalid phone number format' };
-    }
-
-    const parsedDOB = new Date(D_O_B);
-    if (isNaN(parsedDOB.getTime())) {
-      return { message: 'Invalid date of birth format' };
-    }
-
-    const today = new Date();
-    let age = today.getFullYear() - parsedDOB.getFullYear();
-    const m = today.getMonth() - parsedDOB.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
-      age--;
-    }
+    const ninAsNumber = checked.nin;
+    const age = checked.age;
+    createUserDto.role = checked.role;
 
     this.logger.log('Looking for a user with an existing email');
     const phoneVariants = phoneMatchVariants(phoneNumber);
@@ -232,7 +278,7 @@ export class UserService {
         ...createUserDto,
         hub: hubRecord._id,
         NIN: ninAsNumber,
-        phoneNumber: digitsOnly(phoneNumber) || phoneNumberAsNumber,
+        phoneNumber: checked.phoneDigits,
         profilePic: profilePic.secure_url,
         age,
         userID: generateUserID(createUserDto.role),
@@ -286,6 +332,37 @@ export class UserService {
     }
   }
 
+  /**
+   * Membership end date. Prefer a stored end date. Older records only have
+   * a duration in months, counted from the start date or registration date.
+   */
+  private membershipExpiry(user: {
+    end_date?: string | Date | null;
+    expiryDate?: string | Date | null;
+    start_date?: string | Date | null;
+    createdAt?: string | Date | null;
+    duration?: number | null;
+  }): Date | null {
+    const explicit = user.end_date || user.expiryDate;
+    if (explicit) {
+      const date = new Date(explicit);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+
+    const months = Number(user.duration);
+    if (!Number.isFinite(months) || months <= 0) return null;
+
+    const startRaw = user.start_date || user.createdAt;
+    if (!startRaw) return null;
+
+    const start = new Date(startRaw);
+    if (Number.isNaN(start.getTime())) return null;
+
+    const expiry = new Date(start);
+    expiry.setMonth(expiry.getMonth() + months);
+    return expiry;
+  }
+
   async getUserById(id: string) {
     try {
       const user = await this.userModel.findById(id).populate('hub');
@@ -300,14 +377,7 @@ export class UserService {
         hubExpiryDate.setFullYear(hubExpiryDate.getFullYear() + 1);
       }
 
-      let userExpiryDate = null;
-      if (user.expiryDate) {
-        userExpiryDate = user.expiryDate;
-      } else if (user.start_date && user.duration) {
-        const startDate = new Date(user.start_date);
-        userExpiryDate = new Date(startDate);
-        userExpiryDate.setMonth(startDate.getMonth() + user.duration);
-      }
+      const userExpiryDate = this.membershipExpiry(user);
 
       return {
         statusCode: 200,
@@ -394,7 +464,10 @@ export class UserService {
 
   async getUsersByRole(role: string) {
     try {
-      const users = await this.userModel.find({ role }).populate('hub');
+      const canonical = canonicalPersonnelRole(role);
+      const users = await this.userModel
+        .find({ role: canonical || role })
+        .populate('hub');
       return {
         statusCode: 200,
         message: 'Users retrieved successfully',
@@ -518,12 +591,18 @@ export class UserService {
     }
   }
 
-  async suspendUser(id: string, suspensionDto: SuspensionDto) {
+  async suspendUser(
+    id: string,
+    suspensionDto: SuspensionDto,
+    actor: { _id: unknown; role?: string },
+  ) {
     try {
       const userToSuspend = await this.userModel.findById(id).populate('hub');
       if (!userToSuspend) {
         throw new NotFoundException('User not found');
       }
+
+      this.assertCanManageUser(actor, userToSuspend);
 
       const { suspensionReason } = suspensionDto;
 
@@ -552,7 +631,7 @@ export class UserService {
         error: null,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(`Error suspending user: ${error.message}`);
@@ -560,12 +639,14 @@ export class UserService {
     }
   }
 
-  async unSuspendUser(id: string) {
+  async unSuspendUser(id: string, actor: { _id: unknown; role?: string }) {
     try {
       const userToUnsuspend = await this.userModel.findById(id).populate('hub');
       if (!userToUnsuspend) {
         throw new NotFoundException('User not found');
       }
+
+      this.assertCanManageUser(actor, userToUnsuspend);
 
       if (userToUnsuspend.isActive) {
         throw new BadRequestException('User is not suspended');
@@ -590,10 +671,7 @@ export class UserService {
         error: null,
       };
     } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(`Error unsuspending user: ${error.message}`);
@@ -616,19 +694,34 @@ export class UserService {
       throw new NotFoundException('Admin not found');
     }
 
-    const managedHubs = await this.hubModel.find({ admin: adminId }).select({
+    const managedHubs = await this.hubModel.find().select({
       password: 0,
       otp: 0,
       otpCreatedAt: 0,
+      secretToken: 0,
     });
 
     return {
       statusCode: 200,
       message: 'Admin details retrieved successfully',
       data: {
-        admin,
-        hubs: managedHubs,
+        admin: sanitizeDocument(admin),
+        hubs: sanitizeDocument(managedHubs),
       },
+      error: null,
+    };
+  }
+
+  async getPendingUsers() {
+    const pendingUsers = await this.userModel
+      .find({ isApproved: 'pending' })
+      .populate('hub')
+      .exec();
+
+    return {
+      statusCode: 200,
+      message: 'Pending users retrieved successfully',
+      data: sanitizeDocument(pendingUsers),
       error: null,
     };
   }

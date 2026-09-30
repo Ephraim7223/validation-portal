@@ -6,6 +6,7 @@ import { Model } from 'mongoose';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Admin } from 'src/auth/schema';
 import { Hub } from 'src/hubs/schema/hubs.schema';
+import { isAdminRole, normalizeAccountRole } from 'src/common/helpers';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -22,14 +23,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(payload: { sub: string; role: string }) {
     let user;
+    const accountRole = normalizeAccountRole(payload.role);
 
-    if (payload.role === 'admin' || payload.role === 'Super-admin') {
+    if (isAdminRole(accountRole)) {
       user = await this.adminModel
         .findById(payload.sub)
         .select('-password -secretToken')
         .lean()
         .exec();
-    } else if (payload.role === 'hub') {
+    } else if (accountRole === 'hub') {
       user = await this.hubModel
         .findById(payload.sub)
         .select('-password -otp -otpCreatedAt -secretToken')

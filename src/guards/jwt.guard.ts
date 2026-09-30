@@ -1,20 +1,25 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { roleAllowed } from 'src/common/helpers';
 
 export class JwtGuard extends AuthGuard('jwt') {
-  constructor(private roles: string[]) {
+  constructor(private roles: string[] = []) {
     super();
   }
 
   public handleRequest(err: unknown, user: any) {
-    if (!user) {
+    if (err || !user) {
       throw new UnauthorizedException(
         'Invalid or expired token: login to access this resource',
       );
     }
 
-    if (this.roles && !this.roles.includes(user.role)) {
-      throw new UnauthorizedException(
+    if (this.roles.length > 0 && !roleAllowed(user.role, this.roles)) {
+      throw new ForbiddenException(
         'You do not have permission to access this resource',
       );
     }

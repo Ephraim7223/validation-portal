@@ -1,7 +1,7 @@
 import * as QRCode from 'qrcode';
-import * as cron from 'node-cron';
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Injectable,
   Logger,
@@ -25,7 +25,13 @@ import {
   ApproveUserDto,
   ScheduleInterviewDto,
 } from 'src/users/dto/create-user.dto';
-import { JwtHelper, sanitizeDocument, dispatchMail } from 'src/common/helpers';
+import {
+  JwtHelper,
+  sanitizeDocument,
+  dispatchMail,
+  canonicalPersonnelRole,
+  normalizeAccountRole,
+} from 'src/common/helpers';
 import {
   generateHubID,
   generateUserID,
@@ -36,7 +42,6 @@ import { UnSuspensionHubMail } from 'src/templates/unSuspendedHubMail';
 import { AcceptanceMail } from 'src/templates/acceptanceMail';
 import { InterviewMail } from 'src/templates/interviewMail';
 import { SubscriptionStatusMail } from 'src/templates/suscriptionMail';
-import { SubscriptionExpiryMail } from 'src/templates/expiredSuscriptionMail';
 import { ForgotPasswordDto, ResetPasswordDto } from 'src/auth/dto';
 import { IResponse } from 'src/interfaces';
 import { PasswordResetMail } from 'src/templates/password.reset.mail';
@@ -48,6 +53,10 @@ import {
   phoneMatchVariants,
   phoneMatchesStored,
 } from 'src/utils/phone.util';
+import {
+  membershipDateError,
+  validateApplicantFields,
+} from 'src/utils/applicant.validation';
 
 @Injectable()
 export class HubService {
@@ -87,9 +96,18 @@ export class HubService {
     }
     if (NIN) {
       const ninDigits = digitsOnly(NIN);
-      if (ninDigits) {
-        or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
+      if (!/^\d{11}$/.test(ninDigits)) {
+        return {
+          statusCode: 400,
+          message: 'NIN must be 11 digits',
+          data: null,
+          error: {
+            code: 'INVALID_NIN',
+            message: 'NIN must be 11 digits',
+          },
+        };
       }
+      or.push({ NIN: ninDigits }, { NIN: Number(ninDigits) });
     }
 
     if (!or.length) {
@@ -235,10 +253,47 @@ export class HubService {
     return (endYear - startYear) * 12 + (endMonth - startMonth);
   }
 
-  isValidObjectId(id: string): boolean {
+  /** A paid hub stays active for one year from paidAt. */
+  private subscriptionExpiry(paidAt?: Date | string | null): Date | null {
+    if (!paidAt) return null;
+    const paid = new Date(paidAt);
+    if (Number.isNaN(paid.getTime())) return null;
+    const expiry = new Date(paid);
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    return expiry;
+  }
+
+  private subscriptionIsActive(hub: {
+    isPaid?: boolean;
+    paidAt?: Date | string | null;
+  }): boolean {
+    const expiry = this.subscriptionExpiry(hub.paidAt);
+    if (!expiry) return hub.isPaid === true;
+    return expiry.getTime() > Date.now();
+  }
+
+  /** Keep the stored flag aligned with the one-year subscription window. */
+  private async syncSubscription(hub: {
+    isPaid: boolean;
+    paidAt?: Date | null;
+    save: () => Promise<unknown>;
+  }) {
+    const active = this.subscriptionIsActive(hub);
+    if (hub.isPaid !== active) {
+      hub.isPaid = active;
+      await hub.save();
+    }
+    return {
+      isPaid: active,
+      expiryDate: active ? this.subscriptionExpiry(hub.paidAt) : null,
+    };
+  }
+
+  isValidObjectId(id: unknown): boolean {
+    if (id == null) return false;
+    const value = String(id).trim();
     return (
-      mongoose.Types.ObjectId.isValid(id) &&
-      new mongoose.Types.ObjectId(id).toString() === id
+      /^[a-fA-F0-9]{24}$/.test(value) && mongoose.Types.ObjectId.isValid(value)
     );
   }
 
@@ -360,6 +415,17 @@ export class HubService {
       throw new BadRequestException('Passwords do not match');
     }
 
+    if (
+      newPassword.length < 7 ||
+      !/[A-Z]/.test(newPassword) ||
+      !/\d/.test(newPassword) ||
+      !/[^A-Za-z0-9]/.test(newPassword)
+    ) {
+      throw new BadRequestException(
+        'Password must be at least 7 characters and include an uppercase letter, a number, and a special character',
+      );
+    }
+
     const hashedPassword = await argon.hash(newPassword);
     user.password = hashedPassword;
     user.otp = undefined;
@@ -393,14 +459,38 @@ export class HubService {
     const phoneVariants = phoneMatchVariants(phone);
     const normalizedEmail = email?.trim();
 
-    if (!normalizedEmail) {
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return {
         statusCode: 400,
-        message: 'Email is required',
+        message: 'Enter a valid email address',
         data: null,
         error: {
-          code: 'MISSING_EMAIL',
-          message: 'Email is required',
+          code: 'INVALID_EMAIL',
+          message: 'Enter a valid email address',
+        },
+      };
+    }
+
+    if (!createHubDto.address?.trim()) {
+      return {
+        statusCode: 400,
+        message: 'Address is required',
+        data: null,
+        error: {
+          code: 'MISSING_ADDRESS',
+          message: 'Address is required',
+        },
+      };
+    }
+
+    if (!/^\d{8}$/.test(digitsOnly(createHubDto.TIN))) {
+      return {
+        statusCode: 400,
+        message: 'TIN must be 8 digits',
+        data: null,
+        error: {
+          code: 'INVALID_TIN',
+          message: 'TIN must be 8 digits',
         },
       };
     }
@@ -496,42 +586,29 @@ export class HubService {
       createUserDto;
 
     try {
-      const ninAsNumber = parseInt(NIN, 10);
-      if (isNaN(ninAsNumber)) {
+      const checked = validateApplicantFields({
+        email,
+        phoneNumber,
+        NIN,
+        D_O_B,
+        gender: createUserDto.gender,
+        role: createUserDto.role,
+        start_date,
+        end_date,
+        requireMembershipDates: true,
+      });
+      if (checked.ok === false) {
         return {
           statusCode: 400,
-          message: 'Invalid NIN format',
+          message: checked.message,
           data: null,
           error: null,
         };
       }
 
-      const phoneNumberAsNumber = parseInt(phoneNumber, 10);
-      if (isNaN(phoneNumberAsNumber)) {
-        return {
-          statusCode: 400,
-          message: 'Invalid phone number format',
-          data: null,
-          error: null,
-        };
-      }
-
-      const parsedDOB = new Date(D_O_B);
-      if (isNaN(parsedDOB.getTime())) {
-        return {
-          statusCode: 400,
-          message: 'Invalid date of birth format',
-          data: null,
-          error: null,
-        };
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - parsedDOB.getFullYear();
-      const m = today.getMonth() - parsedDOB.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < parsedDOB.getDate())) {
-        age--;
-      }
+      const ninAsNumber = checked.nin;
+      const age = checked.age;
+      createUserDto.role = checked.role;
 
       const existingUser = await this.userModel.findOne({
         $or: [
@@ -599,8 +676,10 @@ export class HubService {
         ...createUserDto,
         hub: hubId,
         NIN: ninAsNumber,
-        phoneNumber: digitsOnly(phoneNumber) || phoneNumberAsNumber,
+        phoneNumber: checked.phoneDigits,
         profilePic: profilePic.secure_url,
+        start_date: String(start_date).slice(0, 10),
+        end_date: String(end_date).slice(0, 10),
         age,
         isPaid: true,
         isActive: true,
@@ -683,11 +762,19 @@ export class HubService {
       }
 
       const token = JwtHelper.signToken(hub._id, hub.role);
+      const subscription = await this.syncSubscription(hub);
 
       return {
         statusCode: 200,
         message: 'Login successful',
-        data: { token, hub: sanitizeDocument(hub) },
+        data: {
+          token,
+          hub: {
+            ...sanitizeDocument(hub),
+            isPaid: subscription.isPaid,
+            expiryDate: subscription.expiryDate,
+          },
+        },
         error: null,
       };
     } catch (error) {
@@ -699,10 +786,24 @@ export class HubService {
   async getAllHubs() {
     try {
       const hubs = await this.hubModel.find().populate('hubs_users').lean();
+      const withSubscription = (
+        sanitizeDocument(hubs) as Array<Record<string, unknown>>
+      ).map((hub) => {
+        const paidAt = hub.paidAt as Date | string | null | undefined;
+        const expiry = this.subscriptionExpiry(paidAt);
+        const isPaid = expiry
+          ? expiry.getTime() > Date.now()
+          : hub.isPaid === true;
+        return {
+          ...hub,
+          isPaid,
+          expiryDate: isPaid ? expiry : null,
+        };
+      });
       return {
         statusCode: 200,
         message: 'Hubs retrieved successfully',
-        data: sanitizeDocument(hubs),
+        data: withSubscription,
         error: null,
       };
     } catch (error) {
@@ -762,18 +863,15 @@ export class HubService {
         throw new NotFoundException('Hub not found');
       }
 
-      let expiryDate = null;
-      if (hub.isPaid && hub.paidAt) {
-        expiryDate = new Date(hub.paidAt);
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      }
+      const subscription = await this.syncSubscription(hub);
 
       return {
         statusCode: 200,
         message: 'Hub retrieved successfully',
         data: {
           ...sanitizeDocument(hub.toObject()),
-          expiryDate: expiryDate,
+          isPaid: subscription.isPaid,
+          expiryDate: subscription.expiryDate,
         },
         error: null,
       };
@@ -920,23 +1018,26 @@ export class HubService {
     try {
       const { email, firstName, lastName, Stack, role } = user;
 
-      const startDate = new Date(start_date);
-      const endDate = new Date(end_date);
-
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      const rangeError = membershipDateError(start_date, end_date);
+      if (rangeError) {
         return {
           statusCode: 400,
-          message: 'Invalid start date or end date',
+          message: rangeError,
           data: null,
           error: null,
         };
       }
+
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
 
       const duration = this.calculateDurationInMonths(startDate, endDate);
 
       const userID = generateUserID(role);
 
       user.duration = duration;
+      user.start_date = String(start_date).slice(0, 10);
+      user.end_date = String(end_date).slice(0, 10);
       user.userID = user.userID || userID;
 
       const hub = await this.hubModel.findById(hubId);
@@ -1021,10 +1122,7 @@ export class HubService {
       };
     }
 
-    if (
-      (interviewDto.interviewDate && !interviewDto.interviewTime) ||
-      (!interviewDto.interviewDate && interviewDto.interviewTime)
-    ) {
+    if (!interviewDto.interviewDate || !interviewDto.interviewTime) {
       return {
         statusCode: 400,
         message:
@@ -1169,8 +1267,9 @@ export class HubService {
 
   async getUsersByRole(role: string, hubId: any) {
     try {
+      const canonical = canonicalPersonnelRole(role);
       const users = await this.userModel
-        .find({ role, hub: hubId })
+        .find({ role: canonical || role, hub: hubId })
         .populate('hub');
       return {
         statusCode: 200,
@@ -1274,7 +1373,17 @@ export class HubService {
   async updatePaidStatus(
     hubId: string,
     updatePaidStatusDto: UpdatePaidStatusDto,
+    actor: { _id: unknown; role?: string },
   ) {
+    if (
+      normalizeAccountRole(actor?.role) === 'hub' &&
+      String(actor._id) !== String(hubId)
+    ) {
+      throw new ForbiddenException(
+        'You can only update your own hub subscription',
+      );
+    }
+
     const { isPaid } = updatePaidStatusDto;
     const hub = await this.hubModel.findById(hubId);
 
@@ -1282,64 +1391,29 @@ export class HubService {
       throw new NotFoundException('Hub not found');
     }
 
-    hub.isPaid = isPaid;
-    hub.paidAt = new Date();
+    if (isPaid) {
+      hub.isPaid = true;
+      hub.paidAt = new Date();
+    } else {
+      hub.isPaid = false;
+      hub.paidAt = undefined;
+    }
     await hub.save();
 
     dispatchMail('hub-payment-status', () =>
-      SubscriptionStatusMail.mail(hub.hubName, hub.email, isPaid, hub._id),
+      SubscriptionStatusMail.mail(hub.hubName, hub.email, hub.isPaid, hub._id),
     );
-
-    this.scheduleExpiryTask(hubId, hub.paidAt);
 
     return {
       statusCode: 200,
       message: 'Hub payment status updated successfully',
-      data: sanitizeDocument(hub),
+      data: {
+        ...sanitizeDocument(hub),
+        isPaid: hub.isPaid,
+        expiryDate: hub.isPaid ? this.subscriptionExpiry(hub.paidAt) : null,
+      },
       error: null,
     };
-  }
-
-  private scheduleExpiryTask(hubId: string, paidAt: Date) {
-    this.logger.log(`Scheduling expiry task for hub ${hubId}`);
-
-    const job = cron.schedule(
-      `*/20 * * * *`,
-      async () => {
-        try {
-          const hub = await this.hubModel.findById(hubId);
-          if (!hub) {
-            this.logger.warn(`Hub ${hubId} not found during expiry task`);
-            job.stop();
-            return;
-          }
-
-          const now = new Date();
-          const twentyMinutesLater = new Date(paidAt.getTime() + 20 * 60000);
-
-          if (now >= twentyMinutesLater) {
-            hub.isPaid = false;
-            await hub.save();
-            this.logger.log(
-              `Updated hub ${hubId} isPaid to false after 20 minutes.`,
-            );
-            dispatchMail('hub-subscription-expiry', () =>
-              SubscriptionExpiryMail.mail(hub.hubName, hub.email),
-            );
-            job.stop();
-          } else {
-            this.logger.log(
-              `Hub ${hubId} is still active. Next check in 20 minutes.`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            `Error in expiry task for hub ${hubId}: ${error.message}`,
-          );
-        }
-      },
-      { scheduled: true },
-    );
   }
 
   async getMe(hubId: string): Promise<IResponse> {
@@ -1363,11 +1437,17 @@ export class HubService {
       otpCreatedAt: 0,
     });
 
+    const subscription = await this.syncSubscription(hub);
+
     return {
       statusCode: 200,
       message: 'Hub details retrieved successfully',
       data: {
-        hub,
+        hub: {
+          ...sanitizeDocument(hub.toObject()),
+          isPaid: subscription.isPaid,
+          expiryDate: subscription.expiryDate,
+        },
         users: hubUsers,
       },
       error: null,
