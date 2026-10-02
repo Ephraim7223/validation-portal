@@ -29,5 +29,7 @@ export enum categoryEnum {
   STARTUPS = 'Startups',
   FREELANCERS = 'Freelancers',
   CREATIVES = 'Creatives',
+  CREATIVE_HUBS = 'Creative Hubs',
+  AGRIC_HUB = 'Agric Hub',
   ICT_COMPANY = 'ICT Company',
 }
